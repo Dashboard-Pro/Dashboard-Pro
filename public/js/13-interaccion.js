@@ -395,3 +395,10 @@ function tick() {
     repaint("farm");
   }
 }
+
+// Donaciones (debajo de la hora): copia la dirección completa de la wallet en Base
+const DONATE_ADDRESS = "0xceE86cA986c103A05dEbcb6C19f57bf6e977dDfa";
+ACTIONS.donate = async () => {
+  try { await navigator.clipboard.writeText(DONATE_ADDRESS); toast(I18N.tr("Dirección copiada: ") + DONATE_ADDRESS); }
+  catch { toast(DONATE_ADDRESS); }
+};
