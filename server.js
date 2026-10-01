@@ -734,6 +734,9 @@ const gitSync = CLOUD ? null : require("./cloud/gitsync").createGitSync({ repoDi
 // App local: volcado nocturno de todas las granjas → data/dump/ (se activa en Ajustes: son ~800 MB al día)
 // Datos del juego al día (public/gamedata.js se regenera solo si falta o tiene más de 7 días)
 const gameUpdater = require("./cloud/gamedata-updater").createGameDataUpdater({ root: ROOT, log: (m) => console.log(m) });
+// Actualizaciones del programa (solo en copias descargadas del repo público; en tu carpeta de desarrollo no hace nada)
+const appUpdater = CLOUD ? null : require("./cloud/updater").createUpdater({ root: ROOT });
+const RESTART_CODE = 42; // tools/run.js vuelve a arrancar el servidor cuando sale con este código
 const GAMEDATA_AUTO = process.env.SFL_GAMEDATA_AUTO !== "0";
 const DUMP_MIN_GAP_MS = Number(process.env.SFL_DUMP_MIN_GAP_MS) || 10 * 60_000;
 const nightly = CLOUD ? null : require("./cloud/nightly").createNightly({
@@ -791,6 +794,19 @@ async function handleApi(req, res, url) {
 
   // Avisos a Discord: tu webhook (config.json, nunca vuelve al navegador) y las categorías elegidas. Los manda
   // el dashboard cuando algo queda listo; el servidor los agrupa y como mucho envía uno por minuto.
+  // Nueva versión del dashboard: GET mira si hay (version.json de GitHub, como mucho cada hora; ?force=1 ya), POST la
+  // instala y reinicia el servidor
+  if (!CLOUD && p === "/api/update") {
+    if (req.method !== "POST") return send(res, 200, await appUpdater.check(url.searchParams.get("force") === "1"));
+    try {
+      const r = await appUpdater.apply();
+      send(res, 200, { ok: true, ...r, restarting: true });
+      console.log(`  Actualizado (${r.method}${r.files != null ? `, ${r.files} archivos` : ""}): reiniciando…`);
+      setTimeout(() => process.exit(RESTART_CODE), 400);
+    } catch (e) { send(res, 409, { error: e.message }); }
+    return;
+  }
+
   if (!CLOUD && p === "/api/gamedata/update") {
     if (req.method !== "POST") return send(res, 200, gameUpdater.status());
     gameUpdater.update({ force: true }).catch(() => {}); // en segundo plano: ~20 s
@@ -1142,6 +1158,11 @@ server.listen(config.port, CLOUD ? process.env.HOST || "0.0.0.0" : "127.0.0.1", 
   if (CLOUD) {
     const c = cloud.info();
     console.log(`  login Discord: ${c.discord ? "sí" : "NO (DISCORD_CLIENT_ID)"}${c.devLogin ? " · login de pruebas ACTIVADO" : ""} · premium: ${c.premium ? "activado" : "apagado"}\n`);
+  }
+  if (appUpdater) {
+    const look = () => appUpdater.check().then((i) => { if (i.available) console.log(`  Hay una versión nueva del dashboard (${i.remote.date?.slice(0, 10)}): actualízala en Ajustes.\n`); }).catch(() => {});
+    setTimeout(look, 30_000);
+    setInterval(look, 6 * 3600_000);
   }
   setTimeout(() => backgroundArchive().catch(() => {}), 15_000);
   setInterval(() => backgroundArchive().catch(() => {}), 20 * 60_000);

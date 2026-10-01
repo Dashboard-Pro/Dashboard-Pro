@@ -403,3 +403,54 @@ function checkNotifications() {
     try { new Notification(`${CATS[k].label}: listo para recoger`, { body, tag: `sfl-${k}` }); } catch { /* ignorar */ }
   }
 }
+
+/* ── Actualizaciones del dashboard (copias descargadas del repo público): Ajustes y chip arriba si hay versión nueva ── */
+S.update = null;
+async function checkUpdate(force = false) {
+  try { S.update = await api(`/api/update${force ? "?force=1" : ""}`); } catch { S.update = null; }
+  const chip = $("#updChip");
+  if (chip) chip.hidden = !S.update?.available;
+  return S.update;
+}
+const verDate = (v) => (v?.date ? new Date(v.date).toLocaleDateString(LOCALE, { day: "numeric", month: "short", year: "numeric" }) : "—");
+async function renderUpdateSettings(force = false) {
+  const el = $("#st-update");
+  if (!el) return;
+  const u = await checkUpdate(force);
+  if (!u?.enabled) {
+    el.innerHTML = `<p class="ctx">Esta copia es la de desarrollo (o un clon de otro repositorio): se actualiza con git, no desde aquí.</p>`;
+    return;
+  }
+  el.innerHTML = `<dl class="kv">
+      <dt>Tu versión</dt><dd>${esc(verDate(u.local))} <span class="faint">${esc((u.local?.sha || "").slice(0, 7))}</span></dd>
+      <dt>La última</dt><dd>${u.remote ? `${esc(verDate(u.remote))} <span class="faint">${esc((u.remote.sha || "").slice(0, 7))}</span>` : "—"}${u.error ? ` <span class="down">(${esc(u.error)})</span>` : ""}</dd>
+      <dt>Cómo</dt><dd>${u.method === "git" ? "git pull (es un clon de git)" : "descarga desde GitHub"}</dd>
+    </dl>
+    <div class="row" style="margin-top:10px">
+      ${u.available ? `<button type="button" class="btn sm" data-act="update:apply">Instalar la versión nueva</button>` : `<span class="tag green">Tienes la última versión</span>`}
+      <button type="button" class="btn ghost sm" data-act="update:check">Buscar actualizaciones</button>
+    </div>
+    <p class="ctx" style="margin-top:8px">Tu key (config.json) y tu historial (data/) no se tocan. El dashboard se reinicia solo al terminar.</p>`;
+}
+ACTIONS.update = async (v) => {
+  if (v === "check") return renderUpdateSettings(true);
+  if (v !== "apply") return;
+  const el = $("#st-update");
+  if (el) el.innerHTML = `<p class="ctx">Descargando e instalando la versión nueva…</p>`;
+  try {
+    await jpost("/api/update");
+    toast("Versión nueva instalada: reiniciando…", 6000);
+    // Espera a que el servidor vuelva y recarga la página con el código nuevo
+    const t0 = Date.now();
+    await new Promise((res) => setTimeout(res, 2500));
+    while (Date.now() - t0 < 60_000) {
+      try { if ((await fetch("/api/status")).ok) return location.reload(); } catch { /* aún arrancando */ }
+      await new Promise((res) => setTimeout(res, 1500));
+    }
+    if (el) el.innerHTML = `<p class="down">El servidor no ha vuelto solo: ciérralo y ábrelo otra vez (start.bat / start.command).</p>`;
+  } catch (e) {
+    toast(e.message);
+    renderUpdateSettings();
+  }
+};
+setTimeout(() => { if (S.mode !== "cloud") checkUpdate(); }, 8000);

@@ -209,6 +209,39 @@ function rawGet(p, headers) {
   });
 }
 
+// ── Actualizaciones de las copias descargadas (cloud/updater.js): versión, descarga del .tar.gz e instalación ──
+async function updaterChecks() {
+  const zlib = require("node:zlib");
+  const { createUpdater, untar } = require(path.join(root, "cloud", "updater.js"));
+  const dir = path.join(tmp, "upd");
+  fs.mkdirSync(path.join(dir, "data"), { recursive: true });
+  fs.writeFileSync(path.join(dir, "version.json"), JSON.stringify({ sha: "aaa", date: "2026-01-01T00:00:00Z" }));
+  fs.writeFileSync(path.join(dir, "config.json"), '{"apiKey":"mia"}');
+  fs.writeFileSync(path.join(dir, "data", "costs.json"), "{}");
+  // .tar de prueba con la carpeta raíz de GitHub, un intento de salirse de la carpeta y archivos protegidos
+  const entry = (name, body) => {
+    const h = Buffer.alloc(512), b = Buffer.from(body);
+    h.write(name, 0); h.write("0000644\0", 100); h.write(b.length.toString(8).padStart(11, "0") + "\0", 124); h.write("0", 156);
+    return Buffer.concat([h, b, Buffer.alloc((512 - (b.length % 512)) % 512)]);
+  };
+  const tar = Buffer.concat([entry("Dashboard-Pro-main/server.js", "// nuevo"), entry("Dashboard-Pro-main/public/js/x.js", "x"),
+    entry("Dashboard-Pro-main/config.json", '{"apiKey":"ajena"}'), entry("Dashboard-Pro-main/../fuera.txt", "no"),
+    entry("Dashboard-Pro-main/data/costs.json", "pisado"), Buffer.alloc(1024)]);
+  ok(untar(tar).length === 5, "actualizador: lee el paquete .tar de GitHub");
+  const fakeFetch = async (u) => (u.includes("version.json")
+    ? { ok: true, json: async () => ({ sha: "bbb", date: "2026-02-01T00:00:00Z" }) }
+    : { ok: true, arrayBuffer: async () => zlib.gzipSync(tar) });
+  const up = createUpdater({ root: dir, fetchImpl: fakeFetch, rawBase: "http://x", tarUrl: "http://x/t.tgz" });
+  const i = await up.check(true);
+  ok(i.enabled && i.available && i.method === "zip", "actualizador: detecta versión nueva en una copia descargada");
+  const r = await up.apply();
+  ok(r.files === 2 && fs.readFileSync(path.join(dir, "server.js"), "utf8") === "// nuevo" && fs.readFileSync(path.join(dir, "config.json"), "utf8").includes("mia")
+    && fs.readFileSync(path.join(dir, "data", "costs.json"), "utf8") === "{}" && !fs.existsSync(path.join(tmp, "fuera.txt")),
+    "actualizador: instala sin tocar config.json, data/ ni salirse de la carpeta");
+  fs.rmSync(path.join(dir, "version.json"));
+  ok(!(await up.check(true)).enabled, "actualizador: sin version.json (carpeta de desarrollo) no hace nada");
+}
+
 // ── Sincronización de data/ por git entre dos "ordenadores" (dos clones de un remoto en temporal) ──
 async function gitSyncChecks() {
   const { execFileSync } = require("node:child_process");
@@ -352,6 +385,7 @@ async function cloudChecks(localPost, localFarm) {
       ok(r1.status === 200 && r1.headers.get("content-encoding") === "gzip" && (await r1.text()).includes("use strict"), "archivos comprimidos con gzip");
       ok(et && (await fetch(base + "/js/01-base.js", { headers: { "if-none-match": et } })).status === 304, "caché con ETag (304 si no cambió)");
     }
+    { const u = await req("/api/update"); ok(u.status === 200 && u.json.enabled === false, "actualizaciones: la carpeta de desarrollo no se actualiza sola"); }
     const farm = await req("/api/farm/29411");
     ok(farm.status === 200 && farm.json.farm && farm.json.id, "granja");
     for (const type of ["marketplaceActivity", "statsLeaderboard", "auctions", "raffles", "discordAnnouncements"]) {
@@ -390,6 +424,7 @@ async function cloudChecks(localPost, localFarm) {
 
     section("Sincronización de data/ por GitHub");
     await gitSyncChecks();
+    await updaterChecks();
 
     section("Nube (modo web, cuentas y sincronización)");
     await cloudChecks(post, farm.json);

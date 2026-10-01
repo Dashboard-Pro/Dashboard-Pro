@@ -31,7 +31,7 @@ if (!fs.existsSync(path.join(dest, ".git"))) {
 // Copia exacta de lo último guardado en git (no de cambios a medias en la carpeta). En la copia pública el README principal
 // es el inglés (lo ven desarrolladores de fuera) y el español pasa a README.es.md
 const RENAME = { "README.md": "README.es.md", "README.en.md": "README.md" };
-const keep = new Set(files.map((f) => RENAME[f] || f));
+const keep = new Set([...files.map((f) => RENAME[f] || f), "version.json"]);
 for (const f of files) {
   const out = path.join(dest, RENAME[f] || f);
   fs.mkdirSync(path.dirname(out), { recursive: true });
@@ -60,6 +60,9 @@ if (!git(["status", "--porcelain"], dest).trim()) {
   console.log("Nada nuevo que publicar.");
   process.exit(0);
 }
+// Versión publicada: la compara el botón «Actualizar» de las copias descargadas (cloud/updater.js)
+fs.writeFileSync(path.join(dest, "version.json"), JSON.stringify({ sha: head, date: new Date().toISOString() }, null, 2) + "\n");
+git(["add", "-A"], dest);
 // Autor: tu nombre de este repo, pero con el email privado de GitHub (el tuyo no sale en un repo que ven otros)
 const who = (k) => { try { return git(["config", k]).trim(); } catch { return ""; } };
 const name = who("user.name") || "SFL Dashboard";
