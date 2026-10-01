@@ -1089,11 +1089,12 @@ button.nav-h:hover { color: var(--text); }
 .lang-btns button { font: 600 15px var(--sans); padding: 10px 22px; cursor: pointer; background: var(--panel-2); color: var(--text); border: 2px solid var(--line-2); }
 .lang-btns button:hover { border-color: var(--sun); color: var(--sun); }
 
-/* Donaciones: debajo de la hora (clic = copia la dirección completa) */
-.clock-wrap { display: flex; flex-direction: column; align-items: center; gap: 3px; }
-.donate { background: none; border: 0; padding: 0; cursor: pointer; font: 10px var(--mono); color: #c9d6bd; text-shadow: 1px 1px 0 #0b120a; white-space: nowrap; }
+/* Donaciones: debajo de los chips de arriba (clic = copia la dirección) */
+.top-right { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+.donate { background: rgba(12, 18, 10, 0.78); border: 0; padding: 2px 8px; cursor: pointer; font: 12.5px var(--mono); color: #d6e2c9; white-space: nowrap; }
 .donate span { color: var(--sun); }
-.donate:hover { color: #fff; }
+.donate:hover { color: #fff; background: rgba(18, 26, 15, 0.95); }
+@media (max-width: 1100px) { .donate span { display: inline-block; max-width: 11ch; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; } }
 @media (max-width: 760px) { .donate { display: none; } }
 /* Con muchos chips arriba el título no desaparece: el buscador encoge antes */
 .top-title { min-width: 150px; }
