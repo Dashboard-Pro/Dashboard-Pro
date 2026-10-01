@@ -38,6 +38,12 @@ for (const f of files) {
     // En la copia pública data/ no se sube nunca (es el historial de cada jugador)
     body = Buffer.from(body.toString("utf8").replace(/^# data\/ SÍ se sube.*\n/m, "") + "# Historial de cada jugador: se queda en su ordenador\ndata/\n");
   }
+  if (f === "README.md") {
+    // Sin enlaces a las guías que no viajan (instalación en tus ordenadores y despliegue)
+    body = Buffer.from(body.toString("utf8")
+      .replace(/\*\*Guías paso a paso: \[MACBOOK\.md\]\(MACBOOK\.md\) para macOS y \[WINDOWS\.md\]\(WINDOWS\.md\) para Windows\*\*\n\(instalación desde cero y cómo sincronizar entre ordenadores\)\. En resumen: i/, "I")
+      .replace(/ Cómo ponerla en internet: \[DESPLIEGUE\.md\]\(DESPLIEGUE\.md\)\./, ""));
+  }
   fs.writeFileSync(out, body);
 }
 // Lo que ya no existe aquí se borra también allí

@@ -12,8 +12,7 @@ npm start            (equivalente en cualquier sistema)
 npm run demo         → datos simulados en http://localhost:4174, sin key
 ```
 
-**Guías paso a paso: [MACBOOK.md](MACBOOK.md) para macOS y [WINDOWS.md](WINDOWS.md) para Windows**
-(instalación desde cero y cómo sincronizar entre ordenadores). En resumen: instala Node, `git clone` del repositorio, `npm run gamedata` (descarga el
+Instala Node, `git clone` del repositorio, `npm run gamedata` (descarga el
 código del juego) y arranca. La API key no está en el repositorio: pégala en Ajustes. La carpeta `data/` (tu
 historial, costes y precios) se sincroniza sola por GitHub entre tus ordenadores (Ajustes → Sincronizar con GitHub). La primera vez en macOS: `chmod +x start.command`.
 
@@ -58,7 +57,7 @@ Se guardan en `config.json`, que solo lee el servidor local; el navegador nunca 
 Opcional. La misma app puede funcionar como **nube** (`npm run nube`): una versión web que no pide keys
 (usa datos públicos con la key del administrador), login con Discord, sincronización de tus precios de compra e
 historial entre ordenadores (Ajustes → Cuenta en la nube, con un código de un solo uso) y premium, que está
-programado y **apagado**. Cómo ponerla en internet: [DESPLIEGUE.md](DESPLIEGUE.md). Probarla en local:
+programado y **apagado**. Probarla en local:
 `npm run nube:demo` → http://localhost:4177.
 
 ## Datos de sfl.world
