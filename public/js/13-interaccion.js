@@ -377,7 +377,7 @@ function tick() {
     el.parentElement.classList.toggle("done", p >= 1);
   }
   const d = new Date(t);
-  $("#clockChip").innerHTML = `<span class="lbl">Local</span><b>${d.toLocaleTimeString("es-ES")}</b><span class="sep"></span><span class="lbl">UTC</span><b>${d.toISOString().slice(11, 16)}</b>`;
+  $("#clockChip").innerHTML = `<span class="lbl">Local</span><b>${d.toLocaleTimeString(LOCALE)}</b><span class="sep"></span><span class="lbl">UTC</span><b>${d.toISOString().slice(11, 16)}</b>`;
   const fa = store.farm?.at;
   // Acotado a 0-60 s: si el reloj del PC salta (suspensión, cambio de hora) no muestra valores absurdos
   const secs = fa ? Math.min(60, Math.max(0, Math.ceil((fa + 60_000 - t) / 1000))) : null;

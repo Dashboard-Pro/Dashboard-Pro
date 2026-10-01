@@ -75,7 +75,7 @@ function wGuideCollect() {
     ${shown.map((r) => `<tr ${r.kind === "wearable" && G.wearableIds[r.name] != null ? `data-open="wearables-${G.wearableIds[r.name]}"` : G.itemIds?.[r.name] != null ? `data-open="collectibles-${G.itemIds[r.name]}"` : ""}>
       <td class="w">${Gi(r.name, 18)} ${esc(r.name)}</td><td class="ctx">${r.kind === "wearable" ? "Prenda" : "Coleccionable"}</td>
       <td class="ctx wrap">${esc(r.buff) || `<span class="faint">decorativo</span>`}</td>
-      <td><span class="tag ${WD_ES[r.rel.k][1]}">${WD_ES[r.rel.k][0]}${r.rel.at ? ` · ${new Date(r.rel.at).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" })}` : ""}</span></td>
+      <td><span class="tag ${WD_ES[r.rel.k][1]}">${WD_ES[r.rel.k][0]}${r.rel.at ? ` · ${new Date(r.rel.at).toLocaleDateString(LOCALE, { day: "numeric", month: "short", year: "numeric" })}` : ""}</span></td>
       <td class="r mono">${r.price == null ? "—" : fmt(r.price, r.price < 1 ? 3 : 2)}</td><td class="r mono ${r.own ? "" : "dim"}">${r.own ? fmt(r.own, 0) : "—"}</td></tr>`).join("")}
     </tbody></table></div>
     <div class="mod-f"><span>${list.length > shown.length ? `Mostrando ${shown.length} de ${fmt(list.length, 0)}: afina con los filtros o el buscador` : `${fmt(list.length, 0)} resultados`}</span><span>Fechas de retiro: withdrawables.ts del juego</span></div>`;

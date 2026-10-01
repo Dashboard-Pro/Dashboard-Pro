@@ -398,7 +398,7 @@ function wMissionKpis() {
     ${Kcell("Valor de lo pedido", `${fmt(cost, 1)}<small>FLW</small>`, `≈ $${fmt(cost * fp, 2)} · ${fmt(tickets ? cost / tickets : 0, 3)} por ticket`)}
     ${Kcell("Entregables ya", `${ready}`, `de ${m.open.length} pedidos abiertos`, ready ? "green" : "")}
     ${Kcell("Ticket más barato", cheapest ? fmt(cheapest.perTicket, 3) : "—", cheapest ? `${NPC_ES(cheapest.from)} · ${cheapest.tickets} tickets` : "")}
-    ${Kcell("Entrega doble", nextDouble ? (nextDouble.date === todayUTC() ? "HOY" : new Date(nextDouble.date + "T00:00:00Z").toLocaleDateString("es-ES", { weekday: "short", day: "numeric" })) : "—", nextDouble ? "tickets ×2 por NPC ese día" : "no hay en el calendario", m.double ? "green" : "")}
+    ${Kcell("Entrega doble", nextDouble ? (nextDouble.date === todayUTC() ? "HOY" : new Date(nextDouble.date + "T00:00:00Z").toLocaleDateString(LOCALE, { weekday: "short", day: "numeric" })) : "—", nextDouble ? "tickets ×2 por NPC ese día" : "no hay en el calendario", m.double ? "green" : "")}
   </div>`;
 }
 

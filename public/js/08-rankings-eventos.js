@@ -138,7 +138,7 @@ async function pcFillExtra(p, farm, nftId) {
     const w = await api(`/api/ext/land/${encodeURIComponent(nftId ?? id)}`);
     const l = w.land || {};
     const cells = [
-      l.created ? `<div class="wide"><span>Juega desde</span><b>${esc(new Date(l.created + "T00:00:00Z").toLocaleDateString("es-ES", { month: "short", year: "numeric" }))}</b></div>` : "",
+      l.created ? `<div class="wide"><span>Juega desde</span><b>${esc(new Date(l.created + "T00:00:00Z").toLocaleDateString(LOCALE, { month: "short", year: "numeric" }))}</b></div>` : "",
       l.marks != null ? `<div><span>Marks</span><b>${fmt(toNum(l.marks), 0)}</b></div>` : "",
       l.cheer != null ? `<div><span>Cheer</span><b>${fmt(toNum(l.cheer), 0)}</b></div>` : "",
     ].join("");

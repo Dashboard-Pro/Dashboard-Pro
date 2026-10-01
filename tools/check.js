@@ -67,6 +67,14 @@ async function uiChecks() {
       ok(!why.length, `página ${p}${why.length ? `: ${why.join(", ")}` : ""}`);
     }
   }
+  // Idioma: la primera vez pregunta; en inglés las páginas se traducen y siguen sin errores
+  const first = await dumpDom(browser, `${base}/#overview`, path.join(tmp, "ui-lang0"));
+  ok(first.includes('class="lang-pick"') && first.includes('data-lang="en"'), "primera vez: pregunta el idioma");
+  for (const p of ["overview", "strategy", "gcooking", "chapter"]) {
+    const d = await dumpDom(browser, `${base}/?lang=en#${p}`, path.join(tmp, `ui-en-${p}`));
+    const why = uiProblems(d, p);
+    ok(!why.length && d.includes('lang="en"') && />Settings</.test(d) && !/>Ajustes</.test(d) && !d.includes('class="lang-pick"'), `inglés: ${p}${why.length ? `: ${why.join(", ")}` : ""}`);
+  }
   // Otra granja en solo lectura (?farm=ID): se dibuja con el aviso y la opción de volver a la tuya
   const other = await dumpDom(browser, `${base}/?farm=555#dig`, path.join(tmp, "ui-view"));
   ok(other.includes('data-drawn="dig"') && /id="viewBanner" class="view-banner"(?! hidden)[^>]*>[\s\S]*#555/.test(other) && !/data-js-errors="\d+"/.test(other), "ver otra granja (?farm=): aviso de solo lectura");

@@ -219,7 +219,7 @@ function wFactionKpis() {
   const f = factionModel();
   if (!f) return Empty("flag", "Sin facción", "No te has unido a ninguna facción.");
   return `<div class="kstrip">
-    ${Kcell("Facción", `<span class="v-txt">${Gi(`${FACTION_ES[f.fac.name]?.replace(/s$/, "")} Faction Banner`, 18)} ${esc(FACTION_ES[f.fac.name] || f.fac.name)}</span>`, f.fac.pledgedAt ? `desde ${new Date(f.fac.pledgedAt).toLocaleDateString("es-ES", { month: "short", year: "numeric" })}` : "")}
+    ${Kcell("Facción", `<span class="v-txt">${Gi(`${FACTION_ES[f.fac.name]?.replace(/s$/, "")} Faction Banner`, 18)} ${esc(FACTION_ES[f.fac.name] || f.fac.name)}</span>`, f.fac.pledgedAt ? `desde ${new Date(f.fac.pledgedAt).toLocaleDateString(LOCALE, { month: "short", year: "numeric" })}` : "")}
     ${Kcell("Tu rango", `<span class="v-txt">${esc(rankEs(f.rank))}</span>`, f.next ? `${fmt(f.emblems, 0)} / ${fmt(f.next.emblems, 0)} ${esc(f.emblemName)} para ${esc(rankEs(f.next))}` : `${fmt(f.emblems, 0)} ${esc(f.emblemName)} · rango máximo`, "sun")}
     ${Kcell("Marks", fmt(f.marks, 0), f.boost ? `boost de rango +${fmt(f.boost * 100, 0)}% en entregas` : "sin boost de rango")}
     ${Kcell("Esta semana", `${fmt(toNum(f.cur.score), 0)}<small>pts</small>`, `${fmt(toNum(f.cur.petXP), 0)} XP a la mascota · acaba en ${dur(f.w.end - now())}`)}
@@ -272,7 +272,7 @@ function wFactionHist() {
   if (!f) return "";
   setSub("fc-hist", `${f.hist.length} semanas guardadas por el juego`);
   return `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Semana</th><th class="r">Puntos</th><th class="r">Puesto</th><th class="r">XP mascota</th><th>Meta</th><th>Premio</th></tr></thead><tbody>
-    ${f.hist.map((h) => `<tr><td class="w">${new Date(h.week + "T00:00:00Z").toLocaleDateString("es-ES", { day: "numeric", month: "short" })}${h.week === f.w.key ? ` <span class="tag sun">ahora</span>` : ""}</td>
+    ${f.hist.map((h) => `<tr><td class="w">${new Date(h.week + "T00:00:00Z").toLocaleDateString(LOCALE, { day: "numeric", month: "short" })}${h.week === f.w.key ? ` <span class="tag sun">ahora</span>` : ""}</td>
       <td class="r"><b>${fmt(toNum(h.score), 0)}</b></td><td class="r dim">${h.results?.rank ? `#${fmt(h.results.rank, 0)}` : "—"}</td><td class="r dim">${compact(toNum(h.petXP))}</td>
       <td>${h.collectivePet?.goalReached ? `<span class="tag green">cumplida</span>` : h.collectivePet?.sleeping ? `<span class="tag red">dormida</span>` : `<span class="tag">no</span>`}</td>
       <td class="dim">${h.results?.reward ? esc(rewardText(h.results.reward)) || "—" : "—"}</td></tr>`).join("")}
@@ -474,11 +474,13 @@ function setDesign(v) {
   } else if (v !== "moderno" && link) link.remove();
   renderDesignSettings();
 }
+ACTIONS.lang = (v) => { if (v !== (LANG || "es")) setLang(v); };
 function renderDesignSettings() {
   const el = $("#st-design");
   if (!el) return;
   const d = currentDesign();
   el.innerHTML = `<div class="row" style="margin-bottom:10px">${Seg([["clasico", "Clásico (pixel)"], ["moderno", "Moderno"]], d, "design")}</div>
+    <div class="row" style="margin:4px 0 10px"><span class="ctx" style="margin-right:8px">Idioma · Language</span><div class="seg" data-noi18n><button data-act="lang:es" class="${LANG !== "en" ? "on" : ""}">Español</button><button data-act="lang:en" class="${LANG === "en" ? "on" : ""}">English</button></div></div>
     <p class="ctx">${d === "moderno" ? "Letra normal, esquinas suaves y bordes finos. Los iconos del juego siguen en pixel." : "El diseño de siempre: letra pixel y marco estilo Sunflower Land."} Se guarda en este navegador.</p>`;
 }
 
@@ -554,5 +556,5 @@ function wCalendar() {
   if (!ev.length) return Empty("calendar", "Calendario vacío", "");
   return ev.map((d) => `<div class="ev"><div class="ico">${sprite(d.name === "doubleDelivery" ? "ticket" : d.name === "fullMoon" ? "sun" : d.weather ? "warn" : "calendar", 16)}</div>
     <div style="min-width:0"><div class="t">${esc(ES[d.name] || d.name)}</div><div class="s">${d.weather ? "clima" : "evento"}</div></div>
-    <div class="tm">${d.date === todayUTC() ? `<span class="up">HOY</span>` : new Date(d.date + "T00:00:00Z").toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short" })}</div></div>`).join("");
+    <div class="tm">${d.date === todayUTC() ? `<span class="up">HOY</span>` : new Date(d.date + "T00:00:00Z").toLocaleDateString(LOCALE, { weekday: "short", day: "numeric", month: "short" })}</div></div>`).join("");
 }

@@ -524,10 +524,10 @@ function wealthChart(pts) {
     s += `<line x1="${X(a.date)}" y1="${Y(a.v)}" x2="${X(b.date)}" y2="${Y(b.v)}" stroke="var(--sun)" stroke-width="2" ${a.real && b.real ? "" : 'stroke-dasharray="4 3" opacity="0.8"'}/>`;
   }
   for (const p of pts) {
-    const tip = `${new Date(t(p.date)).toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short" })}|${fmt(p.v, 0)} FLOWER|${p.now ? "ahora" : p.real ? "foto del día" : "estimado: lo que tienes hoy a los precios de ese día"}`;
+    const tip = `${new Date(t(p.date)).toLocaleDateString(LOCALE, { weekday: "short", day: "numeric", month: "short" })}|${fmt(p.v, 0)} FLOWER|${p.now ? "ahora" : p.real ? "foto del día" : "estimado: lo que tienes hoy a los precios de ese día"}`;
     s += `<rect x="${X(p.date) - 3}" y="${Y(p.v) - 3}" width="6" height="6" fill="${p.real ? "var(--sun)" : "var(--panel)"}" stroke="var(--sun)" data-tip="${esc(tip)}"/>`;
   }
-  const lab = (d) => new Date(t(d)).toLocaleDateString("es-ES", { day: "numeric", month: "short" });
+  const lab = (d) => new Date(t(d)).toLocaleDateString(LOCALE, { day: "numeric", month: "short" });
   s += `<text class="ax" x="${pl}" y="${H - 6}">${lab(pts[0].date)}</text><text class="ax" x="${W - pr}" y="${H - 6}" text-anchor="end">hoy</text>`;
   return s + `</svg>`;
 }
@@ -542,9 +542,9 @@ function wWealthHistory() {
   setSub("ov-wealth-hist", `${pts.length} días${est ? ` · ${est} estimados (a trazos)` : ""}`);
   return `<div class="kstrip">
       ${Kcell("Ahora", `${fmt(last.v, 0)}<small>FLW</small>`, money(last.v), "sun")}
-      ${Kcell("En 7 días", `<span class="${ch(wk) >= 0 ? "up" : "down"}">${pct(ch(wk))}</span>`, `${last.v - wk.v >= 0 ? "+" : "−"}${fmt(Math.abs(last.v - wk.v), 0)} FLOWER desde el ${esc(new Date(Date.parse(wk.date)).toLocaleDateString("es-ES", { day: "numeric", month: "short" }))}`)}
-      ${Kcell("Desde el principio", `<span class="${ch(first) >= 0 ? "up" : "down"}">${pct(ch(first))}</span>`, `desde el ${esc(new Date(Date.parse(first.date)).toLocaleDateString("es-ES", { day: "numeric", month: "short" }))}`)}
-      ${Kcell("Máximo", `${fmt(Math.max(...pts.map((p) => p.v)), 0)}<small>FLW</small>`, esc(new Date(Date.parse(pts.reduce((a, b) => (b.v > a.v ? b : a)).date)).toLocaleDateString("es-ES", { day: "numeric", month: "short" })))}
+      ${Kcell("En 7 días", `<span class="${ch(wk) >= 0 ? "up" : "down"}">${pct(ch(wk))}</span>`, `${last.v - wk.v >= 0 ? "+" : "−"}${fmt(Math.abs(last.v - wk.v), 0)} FLOWER desde el ${esc(new Date(Date.parse(wk.date)).toLocaleDateString(LOCALE, { day: "numeric", month: "short" }))}`)}
+      ${Kcell("Desde el principio", `<span class="${ch(first) >= 0 ? "up" : "down"}">${pct(ch(first))}</span>`, `desde el ${esc(new Date(Date.parse(first.date)).toLocaleDateString(LOCALE, { day: "numeric", month: "short" }))}`)}
+      ${Kcell("Máximo", `${fmt(Math.max(...pts.map((p) => p.v)), 0)}<small>FLW</small>`, esc(new Date(Date.parse(pts.reduce((a, b) => (b.v > a.v ? b : a)).date)).toLocaleDateString(LOCALE, { day: "numeric", month: "short" })))}
     </div><div class="chart" style="padding:8px 12px 4px">${wealthChart(pts)}</div>
     <div class="mod-f"><span>Línea continua = fotos reales de cada día · a trazos = estimado con lo que tienes hoy</span><span>precios: floor (tus listados no cuentan)</span></div>`;
 }
@@ -553,7 +553,7 @@ function wWealthMovers() {
   if (!m) return "";
   const { from, rows } = wealthMovers(m, 7);
   if (!from) return Empty("coin", "Aún sin comparación", "Hace falta al menos un día anterior guardado.");
-  setSub("ov-wealth-mv", `desde el ${esc(new Date(Date.parse(from.date)).toLocaleDateString("es-ES", { day: "numeric", month: "short" }))}`);
+  setSub("ov-wealth-mv", `desde el ${esc(new Date(Date.parse(from.date)).toLocaleDateString(LOCALE, { day: "numeric", month: "short" }))}`);
   const up = rows.filter((x) => x.delta > 0).slice(0, 5), down = rows.filter((x) => x.delta < 0).slice(-5).reverse();
   const row = (x) => `<div class="mv" data-open="${x.r.key}"><span>${Gi(x.r.key, 16)}</span><span class="nm">${esc(x.r.name)}</span><span class="v"><b class="${x.delta > 0 ? "up" : "down"}">${x.delta > 0 ? "+" : "−"}${fmt(Math.abs(x.delta), Math.abs(x.delta) < 10 ? 1 : 0)}</b> · ${pct((x.delta / Math.max(0.0001, x.before)) * 100)}</span></div>`;
   return `<div class="grp"><i class="dot"></i>Lo que más ha subido</div>${up.length ? up.map(row).join("") : `<p class="ctx" style="padding:4px 16px">Nada ha subido</p>`}
@@ -602,7 +602,7 @@ function wTimeline(el, compactRows = false) {
     // Sin marcas pegadas a la línea de "ahora" para que no pisen la etiqueta "listo"
     if (new Date(tk).getHours() % stepH === 0 && X(tk) > x0 + 26) ticks.push(tk);
   }
-  const tickLabel = (ts) => (stepH >= 12 ? new Date(ts).toLocaleString("es-ES", { weekday: "short", hour: "2-digit" }) : hhmm(ts));
+  const tickLabel = (ts) => (stepH >= 12 ? new Date(ts).toLocaleString(LOCALE, { weekday: "short", hour: "2-digit" }) : hhmm(ts));
 
   let s = `<svg viewBox="0 0 ${W} ${H}" height="${H}" shape-rendering="crispEdges">`;
   s += `<text class="tick" x="${labelW + readyW / 2}" y="12" text-anchor="middle">listo</text>`;

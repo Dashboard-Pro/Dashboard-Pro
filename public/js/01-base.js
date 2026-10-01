@@ -68,14 +68,14 @@ const now = () => Date.now() + S.clockOffset;
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const nfCache = {};
-const nf = (d) => (nfCache[d] ||= new Intl.NumberFormat("es-ES", { maximumFractionDigits: d }));
+const nf = (d) => (nfCache[d] ||= new Intl.NumberFormat(LOCALE, { maximumFractionDigits: d }));
 function fmt(n, d) {
   if (n == null || Number.isNaN(n)) return "—";
   const a = Math.abs(n);
   if (d == null) d = a >= 1000 ? 0 : a >= 10 ? 1 : a >= 1 ? 2 : a >= 0.01 ? 4 : 6;
   return nf(d).format(n);
 }
-const compactF = new Intl.NumberFormat("es-ES", { notation: "compact", maximumFractionDigits: 1 });
+const compactF = new Intl.NumberFormat(LOCALE, { notation: "compact", maximumFractionDigits: 1 });
 const compact = (n) => (n == null || Number.isNaN(n) ? "—" : compactF.format(n));
 const pct = (n, d = 1) => {
   if (n == null || !Number.isFinite(n)) return "—";
@@ -104,10 +104,10 @@ function ago(ts) {
   if (s < 86400) return `hace ${Math.floor(s / 3600)} h`;
   return `hace ${Math.floor(s / 86400)} d`;
 }
-const hhmm = (ts) => new Date(ts).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+const hhmm = (ts) => new Date(ts).toLocaleTimeString(LOCALE, { hour: "2-digit", minute: "2-digit" });
 // "14:05" si es en las próximas 24 h, "jue 14:05" si más tarde
-const at = (ts) => (Math.abs(ts - now()) < 20 * 3600_000 ? hhmm(ts) : new Date(ts).toLocaleString("es-ES", { weekday: "short", hour: "2-digit", minute: "2-digit" }));
-const dateShort = (ts) => new Date(ts).toLocaleString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+const at = (ts) => (Math.abs(ts - now()) < 20 * 3600_000 ? hhmm(ts) : new Date(ts).toLocaleString(LOCALE, { weekday: "short", hour: "2-digit", minute: "2-digit" }));
+const dateShort = (ts) => new Date(ts).toLocaleString(LOCALE, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 const utcDay = (offsetDays = 0) => new Date(Date.now() - offsetDays * 86400_000).toISOString().slice(0, 10);
 
 function toast(msg, ms = 3000) {

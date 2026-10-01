@@ -1078,3 +1078,13 @@ button.nav-h:hover { color: var(--text); }
   .nav-grp.folded > a { display: flex; }
 }
 @media (max-width: 760px) { .tab-sheet:not([hidden]) { max-height: calc(100vh - 90px); overflow-y: auto; } .nav-sec { display: none; } }
+
+/* Primera vez: elegir idioma (00-idioma.js) */
+.lang-pick { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; background: rgba(5, 10, 4, 0.82); }
+.lang-panel { background: var(--panel); border: 2px solid var(--line-2); padding: 26px 30px; text-align: center; display: flex; flex-direction: column; gap: 12px; max-width: calc(100vw - 32px); }
+.lang-panel b { font: 700 22px var(--pixel); color: var(--sun); }
+.lang-panel p { margin: 0; color: var(--text); }
+.lang-panel small { color: var(--faint); }
+.lang-btns { display: flex; gap: 10px; justify-content: center; }
+.lang-btns button { font: 600 15px var(--sans); padding: 10px 22px; cursor: pointer; background: var(--panel-2); color: var(--text); border: 2px solid var(--line-2); }
+.lang-btns button:hover { border-color: var(--sun); color: var(--sun); }

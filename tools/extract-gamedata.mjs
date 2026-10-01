@@ -752,6 +752,7 @@ const data = {
   nftCollectibles,
   petNfts,
   buffs,
+  buffsEn: Object.fromEntries(Object.entries(buffsEn).map(([k, v]) => [k, v.join(" · ")])), // los mismos en inglés (interfaz en inglés)
   foods,
   chapterTickets,
   megastore,

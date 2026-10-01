@@ -76,7 +76,7 @@ function wFarmCard() {
       <div class="fc-tags">${vipLeft > 0 ? `<span class="tag sun">VIP · quedan ${Math.ceil(vipLeft / DAY_MS)} días</span>` : `<span class="tag">sin VIP</span>`}
         <span class="tag">racha ${fmt(toNum(farm.dailyRewards?.streaks), 0)}</span>${farm.verified ? `<span class="tag green">verificada</span>` : ""}
         ${farm.faction?.name ? `<span class="tag">${esc(FACTION_ES[farm.faction.name] || farm.faction.name)}</span>` : ""}
-        <span class="tag">${fmt(toNum(inv["Basic Land"]), 0)} expansiones</span><span class="tag">creada ${new Date(toNum(farm.createdAt)).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" })}</span></div>
+        <span class="tag">${fmt(toNum(inv["Basic Land"]), 0)} expansiones</span><span class="tag">creada ${new Date(toNum(farm.createdAt)).toLocaleDateString(LOCALE, { day: "numeric", month: "short", year: "numeric" })}</span></div>
     </div>
     <div class="fc-lvl"><span>Nivel <b>${L.lvl}</b></span><div class="pbar"><i style="width:${fmt(L.p * 100, 0)}%"></i></div><span class="faint">${L.toNext ? `faltan ${compact(L.toNext)} XP` : "máximo"}</span></div>
     <div class="fc-grid">${cells.map(([k, v]) => `<div><span class="eyebrow">${k}</span><b>${v}</b></div>`).join("")}</div>
@@ -154,7 +154,7 @@ function wMinigames() {
   setSub("ov-mini", `${rows.filter((r) => r.done).length} de ${rows.filter((r) => r.target != null).length} premios de hoy`);
   return `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Juego</th><th class="r">Días</th><th class="r">Récord</th><th>Último</th><th class="r">Objetivo hoy</th><th class="r">Premio</th></tr></thead><tbody>
     ${rows.map((r) => `<tr><td class="w">${esc(r.name)}${r.done ? ` <span class="tag green">hecho</span>` : ""}</td><td class="r dim">${r.days}</td><td class="r">${compact(r.record)}</td>
-      <td class="dim">${r.last ? new Date(r.last + "T00:00:00Z").toLocaleDateString("es-ES", { day: "numeric", month: "short" }) : "—"}</td>
+      <td class="dim">${r.last ? new Date(r.last + "T00:00:00Z").toLocaleDateString(LOCALE, { day: "numeric", month: "short" }) : "—"}</td>
       <td class="r">${r.target != null ? `${compact(r.target)} pts` : "—"}</td><td class="r">${r.marks ? `${Gi("Mark", 12)} ${r.marks}` : "—"}</td></tr>`).join("")}
   </tbody></table></div><div class="mod-f"><span>Un juego cuenta como hecho el día que reclamas su premio diario · el juego guarda solo las últimas semanas</span><span></span></div>`;
 }

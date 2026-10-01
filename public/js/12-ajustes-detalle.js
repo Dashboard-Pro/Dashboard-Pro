@@ -173,7 +173,7 @@ function evoChart(pts, ref, buys) {
   for (let i = 1; i < pts.length; i++) d += ` H${X(pts[i].t)} V${Y(pts[i].v)}`;
   const up = ref == null || pts[pts.length - 1].v >= ref;
   s += `<path d="${d}" fill="none" stroke="${up ? "var(--green)" : "var(--red)"}" stroke-width="2"/>`;
-  for (const p of pts) s += `<rect x="${X(p.t) - 2}" y="${Y(p.v) - 2}" width="4" height="4" fill="${up ? "var(--green)" : "var(--red)"}" data-tip="${esc(`${new Date(p.t).toLocaleDateString("es-ES")}|floor ${fmt(p.v)} FLOWER|${ref != null ? pct(((p.v - ref) / ref) * 100) + " vs tu compra" : ""}`)}"/>`;
+  for (const p of pts) s += `<rect x="${X(p.t) - 2}" y="${Y(p.v) - 2}" width="4" height="4" fill="${up ? "var(--green)" : "var(--red)"}" data-tip="${esc(`${new Date(p.t).toLocaleDateString(LOCALE)}|floor ${fmt(p.v)} FLOWER|${ref != null ? pct(((p.v - ref) / ref) * 100) + " vs tu compra" : ""}`)}"/>`;
   if (ref != null) {
     s += `<line x1="${pl}" x2="${W - pr}" y1="${Y(ref)}" y2="${Y(ref)}" stroke="var(--sun)" stroke-dasharray="4 3"/>`;
     s += `<text class="ax" x="${W - pr}" y="${Y(ref) - 4}" text-anchor="end" fill="var(--sun)">tu compra ${fmt(ref)}</text>`;
@@ -182,7 +182,7 @@ function evoChart(pts, ref, buys) {
     const u = toNum(b.sfl) / Math.max(1, toNum(b.quantity));
     s += `<rect x="${X(toNum(b.fulfilledAt)) - 4}" y="${Y(u) - 4}" width="8" height="8" fill="var(--blue)" stroke="#0b0f0a" data-tip="${esc(`Compra ${dateShort(toNum(b.fulfilledAt))}|${fmt(b.quantity)} × ${fmt(u)} FLOWER|`)}"/>`;
   }
-  s += `<text class="ax" x="${pl}" y="${H - 6}">${new Date(t0).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}</text>`;
+  s += `<text class="ax" x="${pl}" y="${H - 6}">${new Date(t0).toLocaleDateString(LOCALE, { day: "numeric", month: "short" })}</text>`;
   s += `<text class="ax" x="${W - pr}" y="${H - 6}" text-anchor="end">hoy</text>`;
   return s + `</svg>`;
 }

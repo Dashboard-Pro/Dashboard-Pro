@@ -103,7 +103,7 @@ function wChKpis() {
     ${Kcell("Esta semana", `${fmt(week, 0)}<small>tickets</small>`, `tareas ${fmt(d.choresWeek, 0)} · bounties ${fmt(d.bountiesWeek, 0)} · entregas ${fmt(d.deliveriesWeek, 0)}`)}
     ${Kcell("Tu ritmo", d.pace != null ? `${fmt(d.pace, 1)}<small>/día</small>` : "—", d.pace != null ? `al final ≈ ${fmt(d.collected + d.pace * d.daysLeft, 0)} ganados` : "")}
     ${Kcell("Pase de recompensas", `Nivel ${d.level}<small>/ ${d.track.length}</small>`, next ? `${fmt(d.points, 0)} / ${fmt(next.points, 0)} puntos para el ${d.level + 1}` : `${fmt(d.points, 0)} puntos · pase completo`)}
-    ${Kcell(esc(d.ch), `${fmt(d.daysLeft, 0)}<small>días</small>`, `acaba el ${new Date(d.c.end).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}`)}
+    ${Kcell(esc(d.ch), `${fmt(d.daysLeft, 0)}<small>días</small>`, `acaba el ${new Date(d.c.end).toLocaleDateString(LOCALE, { day: "numeric", month: "short" })}`)}
   </div>`;
 }
 

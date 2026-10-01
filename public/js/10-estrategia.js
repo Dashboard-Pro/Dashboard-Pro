@@ -191,7 +191,7 @@ function recommendations() {
       add(1, "ticket", `Entrega ya: ${deliverable.slice(0, 3).map((o) => NPC_ES(o.from)).join(", ")}`, `${deliverable.slice(0, 3).reduce((s, o) => s + o.tickets, 0)} tickets a ${fmt(deliverable[0].perTicket, 3)} FLOWER/ticket el más barato`, "missions");
     }
     if (nextDouble && nextDouble.date !== todayUTC()) {
-      add(2, "calendar", `Entrega doble el ${new Date(nextDouble.date + "T00:00:00Z").toLocaleDateString("es-ES", { weekday: "long", day: "numeric" })}`, `Guarda los pedidos de más tickets (${m.ticketOrders.slice().sort((a, b) => b.tickets - a.tickets).slice(0, 2).map((o) => `${NPC_ES(o.from)} ${o.tickets}→${o.tickets * 2}`).join(", ")})`, "missions");
+      add(2, "calendar", `Entrega doble el ${new Date(nextDouble.date + "T00:00:00Z").toLocaleDateString(LOCALE, { weekday: "long", day: "numeric" })}`, `Guarda los pedidos de más tickets (${m.ticketOrders.slice().sort((a, b) => b.tickets - a.tickets).slice(0, 2).map((o) => `${NPC_ES(o.from)} ${o.tickets}→${o.tickets * 2}`).join(", ")})`, "missions");
     }
     if (m.double) add(1, "calendar", "Hoy hay entrega doble", "Cada NPC de tickets paga ×2 en su primera entrega del día", "missions");
     const bounty = m.bounties.filter((b) => b.profit > 0 && b.have >= 1).sort((a, b) => b.profit - a.profit)[0];
@@ -713,7 +713,7 @@ function wTicketToday() {
 function wTicketBoosts() {
   const p = ticketPlan();
   if (!p) return "";
-  const next = p.doubles.slice(0, 4).map((d) => new Date(d.date + "T00:00:00Z").toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short" }));
+  const next = p.doubles.slice(0, 4).map((d) => new Date(d.date + "T00:00:00Z").toLocaleDateString(LOCALE, { weekday: "short", day: "numeric", month: "short" }));
   return `<h4 class="acc-h">Boosts del capítulo <span class="faint">(+1 ticket por entrega cada uno)</span></h4>
     ${p.boosts.map((b) => `<div class="bst-row${b.active ? " on" : ""}"><span class="nm">${esc(b.item)}</span>
       ${b.active ? `<span class="tag green">activo</span>` : b.owned ? `<span class="tag sun">lo tienes: póntelo</span>` : `<span class="tag">te falta</span>`}

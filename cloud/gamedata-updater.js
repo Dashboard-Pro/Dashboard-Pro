@@ -13,7 +13,7 @@ const REQUIRED = ["crops", "itemIds", "wearableIds", "skills", "chores", "foods"
   // Capítulo y facción (tienda de Stella, pase, colección, tienda de Eldric)
   "megastore", "chapterTracks", "factionShop",
   // Guías del juego (retiro, edificios, tiendas, forja solar, entregas de NPCs)
-  "releases", "buildings", "buildingUpgrades", "floatingShop", "nodePrices", "npcDeliveryLevels", "expansionNodes", "npcGifts", "mapPieces"];
+  "releases", "buildings", "buildingUpgrades", "floatingShop", "nodePrices", "npcDeliveryLevels", "expansionNodes", "npcGifts", "mapPieces", "buffsEn"];
 const MIN = { itemIds: 1000, wearableIds: 400, crops: 10, skills: 50, foods: 40, recipes: 50, buffs: 200, flowerSeedOf: 40, itemImages: 1000 };
 
 const parse = (file) => {
