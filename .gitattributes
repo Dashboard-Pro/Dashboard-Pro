@@ -1,0 +1,4 @@
+# Saltos de línea coherentes entre Windows y macOS
+* text=auto eol=lf
+*.bat text eol=crlf
+*.command text eol=lf

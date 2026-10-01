@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SFL Console</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'><rect x='3' width='2' height='8' fill='%23f5c542'/><rect y='3' width='8' height='2' fill='%23f5c542'/><rect x='2' y='2' width='4' height='4' fill='%23f5c542'/><rect x='3' y='3' width='2' height='2' fill='%239a6212'/></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Pixelify+Sans:wght@500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="app.css" />
+  <!-- Diseño elegido en Ajustes → Apariencia: se aplica antes de pintar para que no parpadee -->
+  <script>try { if (JSON.parse(localStorage.getItem("sfl-dash:design")) === "moderno") document.write('<link rel="stylesheet" href="design2.css" id="d2css" />'); } catch (e) {}</script>
+</head>
+<body>
+  <div class="app">
+    <aside class="side">
+      <a class="side-brand" href="#overview">
+        <i data-sprite="sun" data-size="30"></i>
+        <div><b>SFL</b><span>Farm Console</span></div>
+      </a>
+
+      <div class="side-farm" id="sideFarm"></div>
+
+      <!-- Menú en dos bloques (Tu granja / Guías) con grupos plegables; en el móvil, una barra con las pestañas data-tab (js/03-interfaz.js: renderTabbar) -->
+      <nav class="side-nav" id="nav">
+        <div class="nav-sec">Tu granja</div>
+        <div class="nav-grp" data-grp="inicio" data-tab="inicio" data-label="Inicio" data-icon="sun">
+          <a href="#overview" data-page="overview"><i data-sprite="sun"></i><span>Resumen</span><em id="nb-overview"></em></a>
+          <a href="#guide" data-page="guide"><i data-sprite="target"></i><span>Plan de hoy</span><em id="nb-guide"></em></a>
+        </div>
+        <div class="nav-grp" data-grp="granja" data-tab="granja" data-label="Granja" data-icon="sprout">
+          <button type="button" class="nav-h" data-navfold="granja">Granja</button>
+          <a href="#farm" data-page="farm"><i data-sprite="sprout"></i><span>Granja</span><em id="nb-farm"></em></a>
+          <a href="#inventory" data-page="inventory"><i data-sprite="chest"></i><span>Inventario</span><em id="nb-inventory"></em></a>
+          <a href="#skills" data-page="skills"><i data-sprite="bolt"></i><span>Skills</span><em id="nb-skills"></em></a>
+          <a href="#animals" data-page="animals"><i data-sprite="chicken"></i><span>Animales</span><em id="nb-animals"></em></a>
+          <a href="#pets" data-page="pets"><i data-sprite="paw"></i><span>Mascotas</span><em id="nb-pets"></em></a>
+          <a href="#dig" data-page="dig"><i data-sprite="crab"></i><span>Excavación</span><em id="nb-dig"></em></a>
+        </div>
+        <div class="nav-grp" data-grp="progreso" data-tab="granja" data-label="Progreso" data-icon="ticket">
+          <button type="button" class="nav-h" data-navfold="progreso">Progreso</button>
+          <a href="#chapter" data-page="chapter"><i data-sprite="ticket"></i><span>Capítulo</span><em id="nb-chapter"></em></a>
+          <a href="#missions" data-page="missions"><i data-sprite="scroll"></i><span>Misiones</span><em id="nb-missions"></em></a>
+          <a href="#faction" data-page="faction"><i data-sprite="flag"></i><span>Facción</span><em id="nb-faction"></em></a>
+          <a href="#strategy" data-page="strategy"><i data-sprite="target"></i><span>Estrategia</span><em id="nb-strategy"></em></a>
+          <a href="#production" data-page="production"><i data-sprite="machine"></i><span>Producción</span><em id="nb-production"></em></a>
+          <a href="#simulator" data-page="simulator"><i data-sprite="bolt"></i><span>Simulador</span><em id="nb-simulator"></em></a>
+          <a href="#events" data-page="events"><i data-sprite="calendar"></i><span>Eventos</span><em id="nb-events"></em></a>
+        </div>
+        <div class="nav-grp" data-grp="mercado" data-tab="mercado" data-label="Mercado" data-icon="coin">
+          <button type="button" class="nav-h" data-navfold="mercado">Mercado</button>
+          <a href="#market" data-page="market"><i data-sprite="coin"></i><span>Mercado</span><em id="nb-market"></em></a>
+          <a href="#nfts" data-page="nfts"><i data-sprite="gem"></i><span>NFTs</span><em id="nb-nfts"></em></a>
+          <a href="#converter" data-page="converter"><i data-sprite="coin"></i><span>Conversor</span><em id="nb-converter"></em></a>
+        </div>
+        <div class="nav-grp" data-grp="social" data-tab="mercado" data-label="Social" data-icon="friends">
+          <button type="button" class="nav-h" data-navfold="social">Social</button>
+          <a href="#friends" data-page="friends"><i data-sprite="friends"></i><span>Amigos</span><em id="nb-friends"></em></a>
+          <a href="#community" data-page="community"><i data-sprite="globe"></i><span>Comunidad</span><em id="nb-community"></em></a>
+          <a href="#ranks" data-page="ranks"><i data-sprite="trophy"></i><span>Rankings</span><em id="nb-ranks"></em></a>
+        </div>
+        <div class="nav-sec">Guías</div>
+        <div class="nav-grp" data-grp="producir" data-tab="guias" data-label="Producir" data-icon="cook" data-fold="1">
+          <button type="button" class="nav-h" data-navfold="producir">Producir</button>
+          <a href="#gcooking" data-page="gcooking"><i data-sprite="cook"></i><span>Cocina</span><em id="nb-gcooking"></em></a>
+          <a href="#gfishing" data-page="gfishing"><i data-sprite="fish"></i><span>Pesca</span><em id="nb-gfishing"></em></a>
+          <a href="#gflowers" data-page="gflowers"><i data-sprite="flower"></i><span>Flores</span><em id="nb-gflowers"></em></a>
+          <a href="#ganimals" data-page="ganimals"><i data-sprite="chicken"></i><span>Animales</span><em id="nb-ganimals"></em></a>
+          <a href="#gpets" data-page="gpets"><i data-sprite="paw"></i><span>Mascotas</span><em id="nb-gpets"></em></a>
+          <a href="#gcraft" data-page="gcraft"><i data-sprite="hammer"></i><span>Crafteo</span><em id="nb-gcraft"></em></a>
+        </div>
+        <div class="nav-grp" data-grp="crecer" data-tab="guias" data-label="Crecer" data-icon="sprout" data-fold="1">
+          <button type="button" class="nav-h" data-navfold="crecer">Crecer</button>
+          <a href="#glevels" data-page="glevels"><i data-sprite="star"></i><span>Nivel Bumpkin</span><em id="nb-glevels"></em></a>
+          <a href="#gexpand" data-page="gexpand"><i data-sprite="sprout"></i><span>Expansiones</span><em id="nb-gexpand"></em></a>
+          <a href="#gbuild" data-page="gbuild"><i data-sprite="hammer"></i><span>Edificios</span><em id="nb-gbuild"></em></a>
+        </div>
+        <div class="nav-grp" data-grp="comprar" data-tab="guias" data-label="Comprar y entregar" data-icon="coin" data-fold="1">
+          <button type="button" class="nav-h" data-navfold="comprar">Comprar y entregar</button>
+          <a href="#gcollect" data-page="gcollect"><i data-sprite="gem"></i><span>Coleccionables</span><em id="nb-gcollect"></em></a>
+          <a href="#gshops" data-page="gshops"><i data-sprite="coin"></i><span>Tiendas</span><em id="nb-gshops"></em></a>
+          <a href="#gnpc" data-page="gnpc"><i data-sprite="scroll"></i><span>Entregas de NPCs</span><em id="nb-gnpc"></em></a>
+          <a href="#reference" data-page="reference"><i data-sprite="chest"></i><span>Cofres y semillas</span><em id="nb-reference"></em></a>
+        </div>
+        <div class="nav-grp" data-grp="ajustes" data-tab="ajustes" data-label="Ajustes" data-icon="gear">
+          <a href="#settings" data-page="settings"><i data-sprite="gear"></i><span>Ajustes</span><em id="nb-settings"></em></a>
+        </div>
+      </nav>
+      <nav class="tabbar" id="tabbar" aria-label="Secciones"></nav>
+      <div class="tab-sheet" id="tabSheet" hidden></div>
+
+      <div class="side-account" id="sideAccount" hidden></div>
+
+      <div class="side-foot" id="sideFoot">
+        <div class="sf-row"><span class="lbl">API</span><span id="apiState"><i class="dot"></i></span></div>
+        <div class="sf-row"><span class="lbl">Reloj</span><span id="driftState">—</span></div>
+        <div class="sf-row"><span class="lbl">Llamadas</span><span id="callsState">—</span></div>
+      </div>
+    </aside>
+
+    <div class="main">
+      <header class="top">
+        <div class="top-title">
+          <h1 id="pageTitle">Resumen</h1>
+          <p id="pageSub"></p>
+          <div id="viewBanner" class="view-banner" hidden></div>
+        </div>
+        <div class="search">
+          <svg class="search-ic" viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true"><path fill="currentColor" d="M1 0h3v1H1zM0 1h1v3H0zM4 1h1v3H4zM1 4h3v1H1zM5 5h1v1H5zM6 6h1v1H6zM7 7h1v1H7z"/></svg>
+          <input id="search" type="search" placeholder="Buscar item o jugador" autocomplete="off" spellcheck="false" />
+          <kbd>/</kbd>
+          <div class="search-res" id="searchRes" hidden></div>
+        </div>
+        <div class="top-meta">
+          <button class="chip btn-chip stale" id="staleChip" hidden data-action="refresh"></button>
+          <a class="chip btn-chip" id="convChip" href="#converter" hidden></a>
+          <span class="chip" id="flowerChip" hidden data-tip="Precio de FLOWER|Cotización actual en dólares, del informe del marketplace|Se actualiza cada minuto"></span>
+          <span class="chip" id="clockChip" data-tip="Hora|Local: la de tu PC, corregida con la del servidor · UTC: la del juego (entregas, cofre y mascotas se reinician a las 00:00 UTC)|"></span>
+          <button class="chip btn-chip" data-action="refresh" id="refreshBtn" data-tip="Actualizar ahora|La granja se refresca sola cada minuto; el número es la cuenta atrás|Atajo: tecla R">↻ <span id="refreshIn"></span></button>
+        </div>
+      </header>
+
+      <main class="page" id="page"></main>
+    </div>
+  </div>
+
+  <div class="drawer" id="drawer" hidden>
+    <div class="drawer-bg" data-close></div>
+    <aside class="drawer-panel">
+      <button class="drawer-x" data-close aria-label="Cerrar">✕</button>
+      <div id="drawerBody"></div>
+    </aside>
+  </div>
+  <div class="welcome" id="welcome" role="dialog" aria-modal="true" aria-labelledby="wlTitle" hidden>
+    <div class="wl-panel" id="welcomeBody"></div>
+  </div>
+  <div class="pcard" id="playerCard" role="dialog" aria-labelledby="pcName" hidden></div>
+  <div class="tooltip" id="tooltip" hidden></div>
+  <div class="toast" id="toast" hidden></div>
+
+  <script src="gamedata.js"></script>
+  <!-- El código está repartido por secciones (public/js/): scripts clásicos que comparten ámbito, en este orden -->
+  <script src="js/01-base.js"></script>
+  <script src="js/02-datos.js"></script>
+  <script src="js/03-interfaz.js"></script>
+  <script src="js/04-paginas.js"></script>
+  <script src="js/05-cuenta.js"></script>
+  <script src="js/06-granja-mercado.js"></script>
+  <script src="js/07-nfts.js"></script>
+  <script src="js/08-rankings-eventos.js"></script>
+  <script src="js/09-skills-misiones.js"></script>
+  <script src="js/10-estrategia.js"></script>
+  <script src="js/11-social.js"></script>
+  <script src="js/12-ajustes-detalle.js"></script>
+  <script src="js/13-interaccion.js"></script>
+  <script src="js/14-herramientas.js"></script>
+  <script src="js/15-produccion.js"></script>
+  <script src="js/16-animales.js"></script>
+  <script src="js/17-guia-mapa.js"></script>
+  <script src="js/18-referencia.js"></script>
+  <script src="js/19-conversor.js"></script>
+  <script src="js/20-resumen.js"></script>
+  <script src="js/21-inventario.js"></script>
+  <script src="js/22-capitulo.js"></script>
+  <script src="js/23-guias.js"></script>
+  <script src="js/24-guias-juego.js"></script>
+  <script src="js/99-arranque.js"></script>
+</body>
+</html>

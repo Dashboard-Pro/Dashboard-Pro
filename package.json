@@ -1,0 +1,19 @@
+{
+  "name": "sfl-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Dashboard local para Sunflower Land sobre la Community API",
+  "scripts": {
+    "start": "node server.js",
+    "demo": "node tools/demo.js",
+    "demo:nuevo": "node tools/demo-new.js",
+    "test": "node tools/check.js",
+    "gamedata": "node tools/extract-gamedata.mjs --online",
+    "gamedata:local": "node tools/extract-gamedata.mjs",
+    "release": "node tools/release.js",
+    "nube:demo": "node tools/cloud-demo.js",
+    "nube": "node tools/cloud.js",
+    "nocturno": "node tools/nightly-run.js",
+    "publicar": "node tools/publicar.js"
+  }
+}

@@ -1,0 +1,13 @@
+# Tu API key: nunca al repositorio (en cada ordenador se pega en Ajustes)
+config.json
+# Código del juego descargado por npm run gamedata (se regenera)
+.gamesrc/
+# Datos del juego: cada ordenador genera el suyo (se actualizan solos cada semana; así no chocan al sincronizar)
+public/gamedata.js
+public/.gamedata-*.js
+node_modules/
+.DS_Store
+# Paquetes de descarga (npm run release)
+dist/
+# Historial de cada jugador: se queda en su ordenador
+data/

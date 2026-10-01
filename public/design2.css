@@ -1,0 +1,94 @@
+/* SFL Console · Design 2 — "pulido moderno"
+   Capa que va DESPUÉS de app.css: mantiene la identidad Sunflower (verde bosque + girasol)
+   pero sustituye el marco pixelado por hairlines de 1px, esquinas suaves y superficies en capas.
+   La lógica JS y las clases no cambian. Para volver al diseño anterior, quita el <link> en index.html. */
+
+:root {
+  /* Superficies: más neutras y con escalón de luminosidad claro (fondo < panel < elevado) */
+  --bg: #0a0e09;
+  --bg-2: #0e130d;
+  --panel: #131a11;
+  --panel-2: #192217;
+  --panel-3: #212d1e;
+  --line: #243020;
+  --line-2: #34452d;
+  /* Texto: mismo contrato AA que el original (≥4.5:1 sobre --panel-3) */
+  --text: #eef3e6;
+  --muted: #a3b397;
+  --faint: #8a9a7f;
+  /* Acentos */
+  --sun: #f6c945;
+  --sun-2: #ffe08a;
+  --sun-deep: #b58d1e;
+
+  /* Escala de radios y elevación */
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-pill: 999px;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-3: 0 18px 48px rgba(0, 0, 0, 0.6);
+
+  /* Tipografía: el display deja de ser pixel; los sprites del juego siguen pixelados */
+  --pixel: "Space Grotesk", system-ui, sans-serif;
+
+  /* El marco pixelado pasa a ser un hairline de 1px: todos los componentes lo heredan */
+  --px: 0 0 0 1px var(--bc, var(--line-2));
+}
+
+body { font-size: 13.5px; line-height: 1.45; }
+body::before { display: none; }              /* fuera la retícula de papel cuadriculado */
+::-webkit-scrollbar-thumb { border-radius: var(--r-pill); }
+code { border-radius: var(--r-xs); }
+:focus-visible { outline: 2px solid var(--sun); outline-offset: 2px; border-radius: var(--r-sm); }
+
+/* Barra lateral: conserva el césped del juego del diseño clásico (lo pidió el usuario); solo el borde más fino */
+.side { border-right: 1px solid var(--line); }
+.side-brand b { font-weight: 700; font-size: 21px; letter-spacing: 0.02em; text-shadow: none; }
+.side-brand span { font-family: var(--sans); font-size: 10.5px; font-weight: 500; letter-spacing: 0.16em; color: var(--muted) !important; text-shadow: none; }
+.side-nav a { border-radius: var(--r-sm); transition: background 0.15s, color 0.15s; }
+.side-nav a:hover { background: var(--panel-2); }
+.side-nav a.active { background: var(--panel-3) !important; }
+.nav-h { letter-spacing: 0.12em; }
+.side-foot { background: transparent; border-top: 1px solid var(--line); }
+
+/* Títulos con tipografía sans (antes pixel): menos ruido, más jerarquía */
+h1, h2, h3, .top h1, .plate h3, .plate-h {
+  font-family: var(--sans);
+  letter-spacing: -0.01em;
+}
+
+/* Superficies y contenedores */
+.side-farm, .plate, .banner, .pcard, .search-res, .tooltip, .toast,
+.skill, .treecell, .need, .cost-in, .cat, .rchip, .sf-plaque, .tab-sheet:not([hidden]) {
+  border-radius: var(--r-md);
+}
+.plate { background: var(--panel); box-shadow: var(--px), var(--shadow-1); }
+.wl-panel { border-radius: var(--r-lg); box-shadow: var(--px), var(--shadow-3); }
+.pcard, .search-res, .tooltip { box-shadow: var(--px), var(--shadow-2); }
+.toast { box-shadow: var(--px), var(--shadow-2); }
+.tooltip, .toast, .search-res { border-radius: var(--r-md); }
+
+/* Controles */
+.btn { border-radius: var(--r-sm); box-shadow: var(--px), inset 0 -2px 0 rgba(0, 0, 0, 0.18); transition: filter 0.15s, transform 0.05s; }
+.btn:hover { filter: brightness(1.06); }
+.btn:active { transform: translateY(1px); }
+.seg { border-radius: var(--r-sm); overflow: hidden; }
+input[type="text"], input[type="password"], select.inp, input.inp, .search input { border-radius: var(--r-sm); }
+.toggle i { border-radius: var(--r-pill); }
+.chip, .st-tag { border-radius: var(--r-pill); }
+.dot, .help, .pl-av, .sf-av { border-radius: 50%; }
+.drawer-x, .pc-x { border-radius: var(--r-sm); }
+
+/* Tablas: filas con más aire y separadores finos */
+.tbl tbody tr { transition: background 0.12s; }
+.tbl tbody tr:hover { background: var(--panel-2); }
+
+/* Estados de color con significado (sin cambios de tono, solo contorno más fino) */
+.rec, .rec.p1, .rec.p2, .rec.p3 { border-radius: 0; }  /* filas de lista: sin esquina, el acento va en el borde izquierdo */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
