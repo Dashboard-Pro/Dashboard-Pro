@@ -28,10 +28,12 @@ if (!fs.existsSync(path.join(dest, ".git"))) {
   git(["pull", "--ff-only"], dest, { stdio: "inherit" });
 }
 
-// Copia exacta de lo último guardado en git (no de cambios a medias en la carpeta)
-const keep = new Set(files);
+// Copia exacta de lo último guardado en git (no de cambios a medias en la carpeta). En la copia pública el README principal
+// es el inglés (lo ven desarrolladores de fuera) y el español pasa a README.es.md
+const RENAME = { "README.md": "README.es.md", "README.en.md": "README.md" };
+const keep = new Set(files.map((f) => RENAME[f] || f));
 for (const f of files) {
-  const out = path.join(dest, f);
+  const out = path.join(dest, RENAME[f] || f);
   fs.mkdirSync(path.dirname(out), { recursive: true });
   let body = execFileSync("git", ["show", `HEAD:${f}`], { cwd: root, maxBuffer: 64 * 1024 * 1024 });
   if (f === ".gitignore") {
@@ -42,8 +44,10 @@ for (const f of files) {
     // Sin enlaces a las guías que no viajan (instalación en tus ordenadores y despliegue)
     body = Buffer.from(body.toString("utf8")
       .replace(/\*\*Guías paso a paso: \[MACBOOK\.md\]\(MACBOOK\.md\) para macOS y \[WINDOWS\.md\]\(WINDOWS\.md\) para Windows\*\*\n\(instalación desde cero y cómo sincronizar entre ordenadores\)\. En resumen: i/, "I")
-      .replace(/ Cómo ponerla en internet: \[DESPLIEGUE\.md\]\(DESPLIEGUE\.md\)\./, ""));
+      .replace(/ Cómo ponerla en internet: \[DESPLIEGUE\.md\]\(DESPLIEGUE\.md\)\./, "")
+      .replace("(README.en.md)", "(README.md)"));
   }
+  if (f === "README.en.md") body = Buffer.from(body.toString("utf8").replace("(README.md)", "(README.es.md)"));
   fs.writeFileSync(out, body);
 }
 // Lo que ya no existe aquí se borra también allí
