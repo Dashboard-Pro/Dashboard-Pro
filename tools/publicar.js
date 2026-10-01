@@ -1,7 +1,7 @@
 // Publica una copia limpia del dashboard en el repo de la organización (para enseñarlo a terceros, p. ej. el equipo de
 // Sunflower Land): solo el código de la última versión subida, sin tu historial (data/), sin las notas internas y sin las
 // guías de instalación de tus ordenadores. Cada publicación es un commit nuevo en ese repo; el historial de este no viaja.
-// Uso: npm run publicar            (repo por defecto: Dashboard-Pro/sfl-dashboard)
+// Uso: npm run publicar            (repo por defecto: Dashboard-Pro/Dashboard-Pro)
 //      node tools/publicar.js <org/repo>
 const fs = require("node:fs");
 const path = require("node:path");
@@ -9,7 +9,7 @@ const os = require("node:os");
 const { execFileSync } = require("node:child_process");
 
 const root = path.resolve(__dirname, "..");
-const slug = process.argv[2] || "Dashboard-Pro/sfl-dashboard";
+const slug = process.argv[2] || "Dashboard-Pro/Dashboard-Pro";
 const remote = `https://github.com/${slug}.git`;
 const dest = path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), ".local", "share"), "sfl-dashboard-publico", slug.replace("/", "_"));
 // Lo que NO sale: tus datos y las notas o guías personales
