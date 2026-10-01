@@ -306,4 +306,13 @@ function wDigPatterns() {
   }).join("")}</div>`;
 }
 
-if (typeof module !== "undefined") module.exports = { digSolve, digShape, digHoleKind };
+/* ── Skills por nivel (la usan Producción, Simulador y Animales) ── */
+// Valor de nivel `level` con la misma forma que `v1` (el de nivel 1): ranks [0,9; 0,875; 0,85] y v1 0,9 → tal cual;
+// ranks [0,1; 0,15] y v1 0,9 (x0,9) → 1 − r; ranks [0,2…] y v1 20 (+20%) → r × 100. Si no casa, se queda v1.
+const RANK_FORMS = [(x) => x, (x) => x * 100, (x) => 1 - x, (x) => 1 - x / 100, (x) => x / 100];
+function rankValue(ranks, level, v1) {
+  if (!ranks?.length || !(level > 1)) return v1;
+  const t = RANK_FORMS.find((g) => Math.abs(g(ranks[0]) - v1) < 1e-6);
+  return t ? t(ranks[Math.min(level, ranks.length) - 1]) : v1;
+}
+if (typeof module !== "undefined") module.exports = { digSolve, digShape, digHoleKind, rankValue };

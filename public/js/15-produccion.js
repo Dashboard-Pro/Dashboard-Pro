@@ -26,12 +26,30 @@ const SIM_TEMP = /Shrine|Hourglass|Totem/; // temporales: no se simulan como com
 const HONEY_RATE = { "Queen Bee": 1, "Beekeeper Hat": 0.2, "skill:Hyper Bees": 0.1, "skill:Flowery Abode": 0.5 };
 const NODE_TOOL = { Wood: "Axe", Stone: "Pickaxe", Iron: "Stone Pickaxe", Gold: "Iron Pickaxe", Crimstone: "Gold Pickaxe", Sunstone: "Gold Pickaxe", Oil: "Oil Drill" };
 
-// Nombres de boosts que tiene la granja: coleccionables colocados, ropa puesta (tuya y de ayudantes) y skills ("skill:…")
+// Nombres de boosts que tiene la granja: coleccionables colocados, ropa puesta (tuya y de ayudantes) y skills ("skill:…").
+// set.levels guarda el nivel de cada skill ("skill:Tree Charge" → 2) para calcular su efecto real.
 function ownedBoosts(farm) {
   const skills = farm.bumpkin?.skills || {};
-  return new Set([...placedCollectibles(farm), ...wornWearables(farm).map((w) => w.name),
-    ...Object.keys(skills).filter((k) => toNum(skills[k]) > 0).map((k) => `skill:${k}`)]);
+  const owned = Object.keys(skills).filter((k) => toNum(skills[k]) > 0);
+  const set = new Set([...placedCollectibles(farm), ...wornWearables(farm).map((w) => w.name), ...owned.map((k) => `skill:${k}`)]);
+  set.levels = Object.fromEntries(owned.map((k) => [`skill:${k}`, Math.max(1, Math.round(toNum(skills[k])))]));
+  return set;
 }
+const skillMaxLevel = (name) => G.skills?.[name.replace(/^skill:/, "").replace(/@\d+$/, "")]?.ranks?.length || 1;
+
+// Efectos de un boost; para una skill, a su nivel ("skill:X@2" o el nivel indicado). El texto del juego da el valor del
+// nivel 1; los demás niveles salen de skills[n].ranks con la misma forma (x0,9 · +0,1 · +20% · 15% de suerte…).
+function fxOf(name, level) {
+  const at = name.lastIndexOf("@");
+  if (at > 0) { level = Number(name.slice(at + 1)); name = name.slice(0, at); }
+  const base = G.boostFx?.[name] || [];
+  if (!name.startsWith("skill:") || !(level > 1)) return base;
+  const ranks = G.skills?.[name.slice(6)]?.ranks;
+  if (!ranks?.length) return base;
+  return base.map((f) => ({ ...f, v: rankValue(ranks, level, f.v) }));
+}
+// Valor de una skill a tu nivel (`own` = ownedBoosts) dado su valor de nivel 1 en la forma que use el cálculo
+const skillValue = (own, skill, v1) => rankValue(G.skills?.[skill]?.ranks, own.levels?.[`skill:${skill}`], v1);
 const cropTier = (name) => {
   const s = G.crops[name];
   return s <= G.crops.Pumpkin ? "basic" : s >= G.crops.Eggplant ? "advanced" : "medium";
@@ -43,7 +61,7 @@ const seedFlower = (seed) => (G.seedPrices?.[seed] ?? 0) / coinRate();
 function fxOn(line, names, sign = 1) {
   let add = 0, rate = 1;
   for (const name of names) {
-    for (const f of G.boostFx?.[name] || []) {
+    for (const f of fxOf(name, names.levels?.[name])) {
       const hitY = line.tags.includes(f.t), hitT = (line.timeTags || line.tags).includes(f.t);
       if (!hitY && !(f.k === "time" && hitT)) continue;
       const frac = f.aoe ? Math.min(1, f.aoe / Math.max(1, line.n)) : 1;
@@ -229,8 +247,13 @@ PAGE_META.production = { title: "Producción", sub: () => `${staleNote()}Lo que 
    añadir. La diferencia se calcula sobre lo que produces hoy, así que vale aunque tus boosts reales no se conozcan todos. */
 const SIM_KINDS = [["all", "Todo"], ["collectibles", "Coleccionables"], ["wearables", "Ropa"], ["skills", "Skills"]];
 const simKind = (n) => (n.startsWith("skill:") ? "skills" : G.wearableIds?.[n] != null ? "wearables" : "collectibles");
+// on = lo que se añade; off = lo que se quita (las skills, a su nivel). "skill:X@N" = subir una skill tuya al nivel N:
+// se quita la de ahora y se pone la nueva.
 function simAdj(names, own) {
-  const on = names.filter((n) => !own.has(n)), off = names.filter((n) => own.has(n));
+  const lv = (n) => (own.levels?.[n] ? `${n}@${own.levels[n]}` : n);
+  const base = (n) => n.replace(/@\d+$/, "");
+  const on = names.filter((n) => !own.has(n)), off = names.filter((n) => own.has(n)).map(lv);
+  for (const n of names) if (n !== base(n) && own.has(base(n))) off.push(lv(base(n)));
   return (l) => {
     const a = fxOn(l, on, 1), b = fxOn(l, off, -1);
     return { add: a.add + b.add, rate: a.rate * b.rate };
@@ -246,10 +269,17 @@ function simModel() {
     const kind = simKind(name);
     const cost = kind === "skills" ? null : price(name).v;
     const delta = t.total - base.total;
-    return { name, label: name.replace(/^skill:/, ""), kind, own, delta, cost, days: !own && cost && delta > 1e-6 ? cost / delta : null,
+    const level = m.own.levels?.[name];
+    return { name, label: name.replace(/^skill:/, ""), kind, own, delta, cost, days: !own && cost && delta > 1e-6 ? cost / delta : null, level,
       text: kind === "skills" ? G.skills?.[name.slice(6)]?.buff : G.buffs?.[name], points: kind === "skills" ? G.skills?.[name.slice(6)]?.points : null };
   });
-  const sel = [...S.simSet].filter((n) => G.boostFx?.[n]);
+  // Subir de nivel las skills que ya tienes: lo que suma pasar de su nivel actual al siguiente
+  for (const c of cands.filter((x) => x.kind === "skills" && x.own && x.level < skillMaxLevel(x.name))) {
+    const name = `${c.name}@${c.level + 1}`;
+    const t = prodTotals(m, simAdj([name], m.own));
+    cands.push({ ...c, name, own: false, upgrade: c.level + 1, delta: t.total - base.total, days: null, label: `${c.label} → nivel ${c.level + 1}` });
+  }
+  const sel = [...S.simSet].filter((n) => G.boostFx?.[n.replace(/@\d+$/, "")]);
   const withSel = sel.length ? prodTotals(m, simAdj(sel, m.own)) : base;
   const selCost = sel.filter((n) => !m.own.has(n)).reduce((a, n) => a + (price(n).v || 0), 0);
   return { base, withSel, sel, selCost, cands, own: m.own };
@@ -272,18 +302,18 @@ function wSimList() {
   if (!list.length) return Empty("bolt", "Nada que probar", "Ningún boost cambia tu producción con los datos de hoy.");
   const row = (c) => {
     const on = S.simSet.has(c.name);
-    const verb = c.own ? (on ? "quitado" : "quitar") : on ? "probando" : "probar";
+    const verb = c.own ? (on ? "quitado" : "quitar") : c.upgrade ? (on ? "subiendo" : "subir") : on ? "probando" : "probar";
     const ref = c.kind === "wearables" ? `wearables-${G.wearableIds[c.name]}` : c.kind === "collectibles" && G.itemIds[c.name] != null ? `collectibles-${G.itemIds[c.name]}` : null;
-    return `<tr class="${on ? "sel" : ""}"><td class="sm-b"><span class="sm-n">${c.kind === "skills" ? sprite("bolt", 14) : Gi(c.name, 16)} <b>${esc(c.label)}</b>${c.own ? ` <span class="tag green">tuyo</span>` : c.kind === "skills" ? ` <span class="tag">skill</span>` : ""}</span>
+    return `<tr class="${on ? "sel" : ""}"><td class="sm-b"><span class="sm-n">${c.kind === "skills" ? sprite("bolt", 14) : Gi(c.name, 16)} <b>${esc(c.label)}</b>${c.own ? ` <span class="tag green">tuyo${c.level ? ` · nivel ${c.level}` : ""}</span>` : c.upgrade ? ` <span class="tag sun">mejora</span>` : c.kind === "skills" ? ` <span class="tag">skill</span>` : ""}</span>
         <div class="sm-d">${esc(c.text || "")}</div></td>
-      <td class="r mono ${tone(c.delta)}">${Math.abs(c.delta) < 5e-4 ? "0" : signed(c.delta, 3)}<div class="ctx">${c.own ? "si lo quitas" : "si lo añades"}</div></td>
+      <td class="r mono ${tone(c.delta)}">${Math.abs(c.delta) < 5e-4 ? "0" : signed(c.delta, 3)}<div class="ctx">${c.own ? "si lo quitas" : c.upgrade ? "si la subes" : "si lo añades"}</div></td>
       <td class="r mono">${c.kind === "skills" ? `${c.points ?? "?"} pt` : c.cost != null ? (ref ? `<a href="#" data-open="${ref}">${fmt(c.cost, 2)}</a>` : fmt(c.cost, 2)) : "—"}</td>
       <td class="r mono">${c.days != null ? `${fmt(c.days, 0)} d` : "—"}</td>
       <td class="r"><button class="btn sm ${on ? "" : "ghost"}" data-act="sim:${esc(c.name)}">${verb}</button></td></tr>`;
   };
   return `<div class="tbl-wrap"><table class="tbl sm-tbl"><thead><tr><th>Boost</th><th class="r">FLOWER/día${Legend("profit")}</th><th class="r">Precio</th><th class="r" data-tip="Se paga en|Precio ÷ lo que suma al día|" tabindex="0">Se paga en</th><th></th></tr></thead>
     <tbody>${list.slice(0, S.simAll ? 400 : 150).map(row).join("")}</tbody></table></div>
-    <div class="mod-f"><span>Solo cuenta lo que se puede calcular (cantidad, % y tiempo en cultivos, frutas, invernadero, máquina, flores y recursos); las zonas de efecto se reparten entre tus parcelas o nodos. Las skills se simulan en su primer nivel.</span>
+    <div class="mod-f"><span>Solo cuenta lo que se puede calcular (cantidad, % y tiempo en cultivos, frutas, invernadero, máquina, flores y recursos); las zonas de efecto se reparten entre tus parcelas o nodos. Las skills tuyas cuentan a su nivel; las que no tienes, a nivel 1, y las tuyas se pueden subir de nivel.</span>
     <span><label class="toggle"><input type="checkbox" data-act="simall" ${S.simAll ? "checked" : ""}/><i></i>ver también los que no cambian nada</label></span></div>`;
 }
 function wSimBreak() {

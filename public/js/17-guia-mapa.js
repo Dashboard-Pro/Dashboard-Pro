@@ -23,6 +23,8 @@ function guideModel() {
     const noCure = sick.filter((x) => x.perDay != null && x.perDay <= 0), cure = sick.filter((x) => x.perDay != null && x.perDay > 0);
     if (noCure.length) add("now", "warn", `No cures: ${byType(noCure)}`, `Curar cuesta ${fmt(a.cureCost, 3)} FLOWER y pierden dinero cada día (la comida cuesta más de lo que dan). Véndelas en una bounty de su nivel.`, "animals");
     if (cure.length) add("now", "chicken", `Cura: ${byType(cure)}`, `${fmt(a.cureCost, 3)} FLOWER cada una; se paga en ${fmt(a.cureCost / Math.max(1e-9, Math.min(...cure.map((x) => x.perDay))), 1)} días`, "animals");
+    const pet = a.all.filter((x) => x.canLove);
+    if (pet.length) add("now", "chicken", `Acaricia ${pet.length} animal${pet.length > 1 ? "es" : ""}`, `+${fmt(pet[0].love, 0)} XP cada caricia: es comida que te ahorras${pet.some((x) => !x.hasTool) ? " · a alguno le falta su herramienta" : ""}`, "animals");
     const hungry = a.all.filter((x) => x.hungry);
     if (hungry.length) add("now", "chicken", `${hungry.length} animal${hungry.length > 1 ? "es" : ""} con hambre`, a.needs.map((n) => `${fmt(n.q, 1)} ${n.food}`).join(" · "), "animals");
     const losing = a.all.filter((x) => !x.sick && x.perDay != null && x.perDay < 0);

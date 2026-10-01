@@ -39,7 +39,7 @@ function animalXpToGo(type, xp) {
 
 function animalModel() {
   const farm = store.farm.data.farm, t = now(), price = priceBook();
-  const key = `${store.farm.at}|${store.activity?.at}|${S.visitH}`;
+  const key = `${store.farm.at}|${store.activity?.at}|${S.visitH}|${Math.floor(now() / 60_000)}`;
   if (animalModel.c?.key === key) return animalModel.c.out;
   const own = ownedBoosts(farm), A = G.animals || {};
   const foodCost = (food) => {
@@ -69,11 +69,25 @@ function animalModel() {
       const fav = Object.entries(foods).filter(([f]) => f !== "Omnifeed").sort((x, y) => y[1] - x[1])[0] || ["Hay", 10];
       const chonky = own.has("skill:Chonky Feed");
       const favXp = fav[1] * (chonky ? 2 : 1);
-      const mult = [...FEED_MULT.all, ...(FEED_MULT[type] || [])].reduce((m, [n, v]) => (own.has(n) ? m * v : m), 1) * (chonky ? 1.5 : 1);
+      // Las skills de comida cuentan a tu nivel (Efficient Feeding x0,95 → x0,925 en nivel 3)
+      const mult = [...FEED_MULT.all, ...(FEED_MULT[type] || [])].reduce((m, [n, v]) => (own.has(n) ? m * (n.startsWith("skill:") ? skillValue(own, n.slice(6), v) : v) : m), 1) * (chonky ? 1.5 : 1);
       const free = own.has(FREE_FEED[type]);
       const qty = A.requiredQty?.[type] ?? 1;
-      const feedsNow = Math.max(1, Math.ceil(g.toGo / favXp));
-      const feedsCycle = Math.max(1, Math.ceil(g.step / favXp));
+      // Caricias (loveAnimal): mientras duerme, una a 1/3 y otra a 2/3 del sueño, con la herramienta que pide (a.item).
+      // La XP que dan es comida que no hace falta. Por ciclo cuentan las que te deja tu ritmo de visitas (hasta 2).
+      const awakeAt = toNum(a.awakeAt), asleepAt = toNum(a.asleepAt), lovedAt = toNum(a.lovedAt);
+      const loveXp = (A.loveXp?.[a.item] ?? A.loveXp?.["Petting Hand"] ?? 25) + (type === "Cow" && own.has("Baby Cow") ? 10 : 0) + (type === "Sheep" && own.has("Spa Sheep") ? 5 : 0);
+      const love = loveXp * (1 + (own.has("skill:Heartwarming Instruments") ? skillValue(own, "Heartwarming Instruments", 0.5) : 0));
+      const sleepNow = awakeAt > asleepAt ? awakeAt - asleepAt : (A.sleepHours || 24) * 3600_000;
+      const third = sleepNow / 3, nextLoveAt = Math.max(asleepAt + third, lovedAt + third);
+      const asleepNow = a.state !== "sick" && awakeAt > t;
+      const lovesLeft = asleepNow ? (nextLoveAt < awakeAt ? (nextLoveAt + third < awakeAt ? 2 : 1) : 0) : 0;
+      const canLove = asleepNow && nextLoveAt <= t && nextLoveAt < awakeAt;
+      const hasTool = !a.item || a.item === "Petting Hand" || haveOf(a.item) >= 1;
+      const lovesCycle = Math.min(2, Math.floor(((A.sleepHours || 24) * 2) / 3 / Math.max(0.5, S.visitH)));
+      const toGoAfter = Math.max(0, g.toGo - (hasTool ? lovesLeft * love : 0));
+      const feedsNow = toGoAfter > 0 ? Math.max(1, Math.ceil(toGoAfter / favXp)) : 0;
+      const feedsCycle = Math.max(0, Math.ceil(Math.max(0, g.step - lovesCycle * love) / favXp));
       const unit = free ? 0 : foodCost(fav[0]);
       // Lo que da al producir: lo del nivel al que llega + tus boosts (cantidad fija y %) de ese producto
       const drop = A.drops?.[type]?.[g.next] || {};
@@ -87,13 +101,13 @@ function animalModel() {
       const sleepH = (A.sleepHours || 24) / fxOn(fxLine, own).rate;
       const cycleCost = unit == null ? null : feedsCycle * qty * mult * unit;
       const perDay = cycleCost == null || value == null ? null : (24 / cycleH(sleepH, S.visitH)) * (value - cycleCost);
-      const awakeAt = toNum(a.awakeAt), sick = a.state === "sick";
+      const sick = a.state === "sick";
       const asleep = !sick && awakeAt > t, ready = a.state === "ready";
       const hungry = !sick && !asleep && !ready;
       const bounty = bounties.find((b) => b.name === type && Number(b.level) === g.L);
       const bountyValue = bounty ? toNum(bounty.coins) / coinRate() + toNum(bounty.sfl) + valueItems(bounty.items || {}).net : null;
       return { id: a.id, type, xp, ...g, fav: fav[0], favXp, feedsNow, feedsCycle, qty, mult, free, unit, produce, value, cycleCost, perDay, sleepH,
-        awakeAt, sick, asleep, ready, hungry, lovedAt: toNum(a.lovedAt), item: a.item, bounty, bountyValue,
+        awakeAt, sick, asleep, ready, hungry, lovedAt, item: a.item, bounty, bountyValue, love, lovesLeft, lovesCycle, nextLoveAt, canLove, hasTool, toGoAfter,
         foodNow: feedsNow * qty * mult };
     }).sort((x, y) => Number(y.sick) - Number(x.sick) || Number(y.hungry) - Number(x.hungry) || x.awakeAt - y.awakeAt);
     const perDay = rows.reduce((s, r) => s + (r.perDay ?? 0), 0);
@@ -118,6 +132,7 @@ function wAnimalKpis() {
     ${Kcell("Listos para recoger", fmt(c((a) => a.ready), 0), "producción esperando", c((a) => a.ready) ? "up" : "")}
     ${Kcell("Con hambre", fmt(c((a) => a.hungry), 0), "despiertos sin comer", c((a) => a.hungry) ? "sun" : "")}
     ${Kcell("Durmiendo", fmt(c((a) => a.asleep), 0), "producen al despertar y comer")}
+    ${Kcell("Para acariciar", fmt(c((a) => a.canLove), 0), "ya puedes darles su caricia", c((a) => a.canLove) ? "sun" : "")}
     ${Kcell("Enfermos", fmt(c((a) => a.sick), 0), m.cureCost == null ? "Barn Delight sin precio" : `curar: ${fmt(m.cureCost, 3)} FLOWER cada uno`, c((a) => a.sick) ? "down" : "")}
     ${Kcell("Ganancia al día", `<span class="${tone(m.perDay)}">${signed(m.perDay, 2)}</span>`, "producción − comida")}
   </div>`;
@@ -153,12 +168,13 @@ function animalHouseTable(h, m) {
       const state = a.sick ? `<span class="tag red">enfermo</span>` : a.ready ? `<span class="tag green">listo</span>` : a.asleep ? `<span class="tag">duerme</span> <span class="ctx">${dur(a.awakeAt - t)}</span>` : `<span class="tag sun">con hambre</span>`;
       const prod = a.produce.map((p) => `${Gi(p.item, 14)} ${fmt(p.amt, 2)}`).join(" ") || "—";
       return `<tr><td>${Gi(a.type, 18)} ${ANIMAL_ES[a.type] || a.type} <span class="dim">nv ${a.L}</span></td><td>${state}</td>
-        <td class="r mono">${fmt(a.toGo, 0)} XP<div class="ctx">${a.free ? "come gratis" : `${fmt(a.foodNow, 2)} ${esc(a.fav)}`}</div></td>
+        <td class="r mono">${fmt(a.toGo, 0)} XP${a.lovesLeft ? `<div class="ctx${a.canLove ? " sun-t" : ""}">${a.canLove ? "caricia ya" : `caricia en ${dur(a.nextLoveAt - t)}`}: +${fmt(a.love, 0)} XP · ${esc(a.item || "Petting Hand")}${a.hasTool ? "" : " (no la tienes)"}</div>` : ""}
+          <div class="ctx">${a.free ? "come gratis" : a.feedsNow ? `${a.lovesLeft && a.hasTool ? "luego " : ""}${fmt(a.foodNow, 2)} ${esc(a.fav)}` : "le bastan las caricias"}</div></td>
         <td class="r mono">${prod}<div class="ctx">${a.value == null ? "sin precio" : `${fmt(a.value, 3)} FLOWER`}</div></td>
         <td class="r mono">${a.cycleCost == null ? "—" : fmt(a.cycleCost, 3)}<div class="ctx">${a.feedsCycle} toma${a.feedsCycle > 1 ? "s" : ""} × ${a.qty}${a.mult !== 1 ? ` × ${fmt(a.mult, 2)}` : ""}</div></td>
         <td class="r mono ${tone(a.perDay)}"><b>${a.perDay == null ? "—" : signed(a.perDay, 3)}</b></td><td>${animalAdvice(a, m.cureCost)}</td></tr>`;
     }).join("")}</tbody></table></div>
-    <div class="mod-f"><span>Un ciclo = de un nivel al siguiente con su comida favorita; duerme ${fmt(h.rows[0]?.sleepH ?? 24, 1)} h y lo recoges según tu ritmo (cada ${S.visitH} h)</span><span>sin contar caricias ni animales mutantes</span></div>`;
+    <div class="mod-f"><span>Un ciclo = de un nivel al siguiente con su comida favorita; duerme ${fmt(h.rows[0]?.sleepH ?? 24, 1)} h y lo recoges según tu ritmo (cada ${S.visitH} h)</span><span>con ${h.rows[0]?.lovesCycle ?? 0} caricia${h.rows[0]?.lovesCycle === 1 ? "" : "s"} por noche (lo que te deja tu ritmo) · sin animales mutantes</span></div>`;
 }
 
 PAGES.animals = function animals() {

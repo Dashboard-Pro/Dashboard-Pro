@@ -71,8 +71,10 @@ async function uiChecks() {
   const first = await dumpDom(browser, `${base}/#overview`, path.join(tmp, "ui-lang0"));
   ok(first.includes('class="lang-pick"') && first.includes('data-lang="en"'), "primera vez: pregunta el idioma");
   for (const p of ["overview", "strategy", "gcooking", "chapter"]) {
-    const d = await dumpDom(browser, `${base}/?lang=en#${p}`, path.join(tmp, `ui-en-${p}`));
-    const why = uiProblems(d, p);
+    let d = await dumpDom(browser, `${base}/?lang=en#${p}`, path.join(tmp, `ui-en-${p}`));
+    let why = uiProblems(d, p);
+    // Igual que en español: un fallo suelto de carga se repite una vez
+    if (why.length) { d = await dumpDom(browser, `${base}/?lang=en#${p}`, path.join(tmp, `ui-en-${p}-2`)); why = uiProblems(d, p); }
     ok(!why.length && d.includes('lang="en"') && />Settings</.test(d) && !/>Ajustes</.test(d) && !d.includes('class="lang-pick"'), `inglés: ${p}${why.length ? `: ${why.join(", ")}` : ""}`);
   }
   // Con el idioma ya elegido, la primera vez arranca la mini guía por el dashboard
@@ -153,6 +155,12 @@ ok(Object.values(G.chapterArtefact || {}).includes("Otter Pebble"), "artefacto d
   const t0 = Date.now(), early = digSolve({ patterns, holes: holes.slice(0, 3) });
   ok(!early.impossible && Date.now() - t0 < 3000 && Math.abs(early.cells.reduce((a, c) => a + c.chance, 0) - total) < 1e-6, "excavación: rápido con pocos hoyos (aproximado)");
   ok(digSolve({ patterns, holes: [{ x: 0, y: 0, item: "Pirate Bounty" }] }).impossible, "excavación: detecta datos que no encajan");
+  // Skills a su nivel: el valor de nivel N con la misma forma que el texto del juego (nivel 1)
+  const { rankValue } = require("../public/js/14-herramientas.js");
+  const near = (a, b) => Math.abs(a - b) < 1e-9;
+  ok(near(rankValue([0.9, 0.875, 0.85], 3, 0.9), 0.85) && near(rankValue([0.1, 0.2, 0.3], 2, 0.9), 0.8) && near(rankValue([0.2, 0.3], 2, 20), 30) && rankValue([0.5, 0.6], 1, 0.5) === 0.5,
+    "skills a su nivel (x0,9 · −10% · +20% · nivel 1)");
+  ok(G.animals?.loveXp?.["Petting Hand"] > 0 && G.animals.loveXp.Brush > G.animals.loveXp["Petting Hand"], "XP de las caricias de animales");
 }
 ok(G.seedPrices?.["Sunflower Seed"] === 0.01 && G.seedPrices["Lily Seed"] > 0 && G.seedStock?.["Sunflower Seed"] > 0 && G.greenhouseOil?.["Rice Seed"] > 0, "precios y stock de semillas, aceite del invernadero");
 ok(G.cropMachineSeeds?.basic?.includes("Sunflower Seed") && Object.keys(G.cropMachineSeeds).length >= 2, "semillas de la Crop Machine");

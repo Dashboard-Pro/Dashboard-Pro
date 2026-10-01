@@ -24,7 +24,7 @@ const NEEDED = [
   "types/expansions.ts", "events/landExpansion/upgradeFarm.ts", "types/images.ts",
   "types/pets.ts", "lib/factionRanks.ts", "events/landExpansion/joinFaction.ts", "types/desert.ts", "types/treasure.ts",
   "events/landExpansion/plantGreenhouse.ts", "events/landExpansion/supplyCropMachine.ts",
-  "types/animals.ts", "events/landExpansion/feedAnimal.ts", "types/buildings.ts", "types/chests.ts", "types/fishing.ts", "types/game.ts",
+  "types/animals.ts", "events/landExpansion/feedAnimal.ts", "events/landExpansion/loveAnimal.ts", "types/buildings.ts", "types/chests.ts", "types/fishing.ts", "types/game.ts",
   "types/megastore.ts", "types/tracks.ts", "types/collections.ts", "types/chapterMutants.ts", "lib/crafting.ts", "types/factionShop.ts",
   "types/withdrawables.ts", "events/landExpansion/upgradeBuilding.ts", "types/composters.ts", "events/landExpansion/startLavaPit.ts",
   "types/floatingIsland.ts", "types/collectibles.ts", "types/calendar.ts", "events/landExpansion/buyResource.ts", "types/gifts.ts",
@@ -540,6 +540,8 @@ const animals = {
   foods: Object.fromEntries(Object.entries(tsLiteral(animalsSrc, "ANIMAL_FOODS")).map(([k, v]) => [k, { type: v.type, ingredients: v.ingredients }])),
   requiredQty: tsLiteral(feedSrc, "REQUIRED_FOOD_QTY"),
   coins: Object.fromEntries(Object.entries(tsLiteral(animalsSrc, "ANIMALS")).map(([k, v]) => [k, v.coins])),
+  // Caricias (loveAnimal.ts): XP de cada herramienta; dos por noche, a 1/3 y 2/3 del sueño
+  loveXp: tsLiteral(read("events/landExpansion/loveAnimal.ts"), "ITEM_XP"),
   sleepHours: (num(feedSrc.match(/ANIMAL_SLEEP_DURATION\s*=\s*([^;]+);/)?.[1] || "") || 86400000) / 3600000,
 };
 
