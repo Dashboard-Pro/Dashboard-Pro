@@ -1099,3 +1099,5 @@ button.nav-h:hover { color: var(--text); }
 /* Con muchos chips arriba el título no desaparece: el buscador encoge antes */
 .top-title { min-width: 150px; }
 .top .search { flex: 0 1 340px; min-width: 170px; }
+/* El buscador, lo más a la izquierda de la barra de arriba (antes del título de la página) */
+.top .search { order: -1; }
