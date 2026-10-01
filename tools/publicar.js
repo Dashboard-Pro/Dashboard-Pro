@@ -43,8 +43,8 @@ for (const f of files) {
   if (f === "README.md") {
     // Sin enlaces a las guías que no viajan (instalación en tus ordenadores y despliegue)
     body = Buffer.from(body.toString("utf8")
-      .replace(/\*\*Guías paso a paso: \[MACBOOK\.md\]\(MACBOOK\.md\) para macOS y \[WINDOWS\.md\]\(WINDOWS\.md\) para Windows\*\*\n\(instalación desde cero y cómo sincronizar entre ordenadores\)\. En resumen: i/, "I")
-      .replace(/ Cómo ponerla en internet: \[DESPLIEGUE\.md\]\(DESPLIEGUE\.md\)\./, "")
+      .replace(/^Guías paso a paso[^\n]*\n\n?/m, "")
+      .replace(/ Cómo ponerla en internet:\s*\[DESPLIEGUE\.md\]\(DESPLIEGUE\.md\)\./, "")
       .replace("(README.en.md)", "(README.md)"));
   }
   if (f === "README.en.md") body = Buffer.from(body.toString("utf8").replace("(README.md)", "(README.es.md)"));
