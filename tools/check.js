@@ -75,6 +75,9 @@ async function uiChecks() {
     const why = uiProblems(d, p);
     ok(!why.length && d.includes('lang="en"') && />Settings</.test(d) && !/>Ajustes</.test(d) && !d.includes('class="lang-pick"'), `inglés: ${p}${why.length ? `: ${why.join(", ")}` : ""}`);
   }
+  // Con el idioma ya elegido, la primera vez arranca la mini guía por el dashboard
+  const tourDom = await dumpDom(browser, `${base}/?lang=es#overview`, path.join(tmp, "ui-tour"));
+  ok(tourDom.includes('id="tour"') && tourDom.includes("Saltar guía"), "primera vez: mini guía después de elegir idioma");
   // Otra granja en solo lectura (?farm=ID): se dibuja con el aviso y la opción de volver a la tuya
   const other = await dumpDom(browser, `${base}/?farm=555#dig`, path.join(tmp, "ui-view"));
   ok(other.includes('data-drawn="dig"') && /id="viewBanner" class="view-banner"(?! hidden)[^>]*>[\s\S]*#555/.test(other) && !/data-js-errors="\d+"/.test(other), "ver otra granja (?farm=): aviso de solo lectura");

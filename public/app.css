@@ -1109,3 +1109,14 @@ button.nav-h:hover { color: var(--text); }
 .side-donate:hover { border-color: var(--sun); }
 .side-donate + .side-foot { margin-top: 0; }
 @media (max-width: 1320px) { .side-donate { display: none; } }
+
+/* Mini guía (25-tutorial.js): oscurece todo menos la zona que explica */
+#tour { position: fixed; inset: 0; z-index: 150; }
+.tour-hole { position: fixed; border: 2px solid var(--sun); box-shadow: 0 0 0 9999px rgba(4, 8, 3, 0.72); transition: all 0.25s ease; pointer-events: none; }
+.tour-card { position: fixed; z-index: 151; background: var(--panel); border: 2px solid var(--sun); padding: 14px 16px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  display: flex; flex-direction: column; gap: 6px; transition: left 0.25s ease, top 0.25s ease; max-width: calc(100vw - 24px); }
+.tour-card b { font: 700 17px var(--pixel); color: var(--sun); }
+.tour-card p { margin: 0; color: var(--text); font-size: 13.5px; line-height: 1.45; }
+.tour-n { font: 600 10px var(--sans); letter-spacing: 0.1em; color: var(--faint); }
+.tour-btns { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+.tour-skip { margin-right: auto; background: none; border: 0; padding: 0; color: var(--muted); font: 12px var(--sans); cursor: pointer; text-decoration: underline; }

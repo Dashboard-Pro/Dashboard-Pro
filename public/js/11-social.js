@@ -481,7 +481,8 @@ function renderDesignSettings() {
   const d = currentDesign();
   el.innerHTML = `<div class="row" style="margin-bottom:10px">${Seg([["clasico", "Clásico (pixel)"], ["moderno", "Moderno"]], d, "design")}</div>
     <div class="row" style="margin:4px 0 10px"><span class="ctx" style="margin-right:8px">Idioma · Language</span><div class="seg" data-noi18n><button data-act="lang:es" class="${LANG !== "en" ? "on" : ""}">Español</button><button data-act="lang:en" class="${LANG === "en" ? "on" : ""}">English</button></div></div>
-    <p class="ctx">${d === "moderno" ? "Letra normal, esquinas suaves y bordes finos. Los iconos del juego siguen en pixel." : "El diseño de siempre: letra pixel y marco estilo Sunflower Land."} Se guarda en este navegador.</p>`;
+    <p class="ctx">${d === "moderno" ? "Letra normal, esquinas suaves y bordes finos. Los iconos del juego siguen en pixel." : "El diseño de siempre: letra pixel y marco estilo Sunflower Land."} Se guarda en este navegador.</p>
+    <p style="margin-top:10px"><button type="button" class="btn ghost sm" data-act="tour:start">Ver la guía del dashboard otra vez</button></p>`;
 }
 
 // Avisos a Discord: pegas el webhook de tu canal (Editar canal → Integraciones → Webhooks) y eliges qué avisar
