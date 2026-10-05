@@ -304,7 +304,10 @@ function npcGiftModel() {
   const N = G.npcGifts || {}, farm = gFarm();
   const bb = farm ? rankVal("Blossom Bonding", skillRank(farm, "Blossom Bonding"), [2, 3, 4]) : 0;
   const npcs = [...new Set([...Object.keys(N.bonuses || {}), ...Object.keys(N.gifts || {})])];
-  return npcs.map((npc) => {
+  // Lo que te cuesta cada flor (semilla + cruce más barato, Flores): para no regalar una flor cara si otra da casi lo mismo
+  const fcost = {};
+  try { for (const s of flowerGuideModel().seeds) for (const f of s.flowers) if (f.cost != null) fcost[f.name] = f.cost; } catch { /* sin precios */ }
+  const list = npcs.map((npc) => {
     const fr = farm?.npcs?.[npc]?.friendship || {}, points = toNum(fr.points), claimed = toNum(fr.giftClaimedAtPoints);
     const g = N.gifts?.[npc];
     let next = null;
@@ -314,13 +317,26 @@ function npcGiftModel() {
     }
     const ptsFor = (f) => toNum(N.points?.[f]) + toNum(N.bonuses?.[npc]?.[f]) + bb;
     const fav = Object.keys(N.bonuses?.[npc] || {}).map((f) => ({ f, pts: ptsFor(f), have: farm ? haveOf(f) : 0 })).sort((a, b) => b.pts - a.pts);
-    // Lo mejor que tienes para darle: la flor del inventario que más puntos le da
-    const mine = farm ? Object.keys(N.points || {}).filter((f) => haveOf(f) > 0).map((f) => ({ f, pts: ptsFor(f), have: haveOf(f) })).sort((a, b) => b.pts - a.pts)[0] || null : null;
+    // Flores del inventario que le puedes dar, de mejor a peor: puntos por FLOWER que te cuesta la flor (si se sabe),
+    // y a igualdad, sus favoritas y más puntos
+    const cands = farm ? Object.keys(N.points || {}).filter((f) => haveOf(f) > 0).map((f) => {
+      const pts = ptsFor(f), c = fcost[f];
+      return { f, pts, have: haveOf(f), cost: c ?? null, eff: c > 0 ? pts / c : null, favorite: Boolean(N.bonuses?.[npc]?.[f]) };
+    }).sort((a, b) => (b.eff ?? -1) - (a.eff ?? -1) || Number(b.favorite) - Number(a.favorite) || b.pts - a.pts) : [];
     const toGo = next ? Math.max(0, next.friendshipPoints - points) : null;
-    const per = fav[0]?.pts || mine?.pts || 3 + bb; // al ritmo de su flor favorita (la que plantarías para él)
-    return { npc, points, next, toGo, ready: Boolean(next) && toGo === 0, fav, mine,
-      giftedToday: fr.giftedAt ? new Date(fr.giftedAt).toISOString().slice(0, 10) === todayUTC() : false, flowersNeeded: toGo ? Math.ceil(toGo / per) : 0 };
+    return { npc, points, next, toGo, ready: Boolean(next) && toGo === 0, fav, cands, mine: null,
+      giftedToday: fr.giftedAt ? new Date(fr.giftedAt).toISOString().slice(0, 10) === todayUTC() : false };
   }).sort((a, b) => b.ready - a.ready || (a.toGo ?? 1e9) - (b.toGo ?? 1e9));
+  // Reparto: una flor al día por NPC, sin recomendar más flores de las que tienes (primero a los que antes llegan al regalo)
+  const left = {};
+  for (const n of list) {
+    const pick = n.cands.find((c) => (left[c.f] ?? c.have) > 0) || null;
+    if (pick && !n.giftedToday) left[pick.f] = (left[pick.f] ?? pick.have) - 1;
+    n.mine = pick;
+    const per = n.fav[0]?.pts || pick?.pts || 3 + bb; // al ritmo de su flor favorita (la que plantarías para él)
+    n.flowersNeeded = n.toGo ? Math.ceil(n.toGo / per) : 0;
+  }
+  return list;
 }
 function wGuideGifts() {
   const farm = gFarm();
@@ -340,9 +356,9 @@ function wGuideGifts() {
       sub: n.next ? `Siguiente regalo a ${fmt(n.next.friendshipPoints, 0)}: ${giftTxt(n.next)}` : "no da regalos",
       body: favRows(n),
       stats: [["Amistad", farm ? fmt(n.points, 0) : "—"], ["Faltan", n.toGo == null || !farm ? "—" : n.toGo ? `${fmt(n.toGo, 0)} · ≈${n.flowersNeeded} flores` : "✓", n.toGo === 0 ? "up" : ""],
-        ["Lo mejor que tienes", n.mine ? `${esc(n.mine.f)} +${n.mine.pts}` : "—", n.mine && !n.giftedToday ? "up" : "dim"]],
+        ["Dale", n.mine ? `${esc(n.mine.f)} +${n.mine.pts}${n.mine.favorite ? " ★" : ""}` : "—", n.mine && !n.giftedToday ? "up" : "dim"]],
     })).join("")}</div>
-  <div class="mod-f"><span>Primero los que tienen el regalo listo y a los que puedes dar una flor hoy · puntos por flor = los de la flor + el extra de sus favoritas${farm && skillRank(farm, "Blossom Bonding") ? " + Blossom Bonding" : ""} · en verde, las favoritas que tienes</span><span>Regalos: gifts.ts del juego</span></div>`;
+  <div class="mod-f"><span>Primero los que tienen el regalo listo y a los que puedes dar una flor hoy · "Dale" = la flor que tienes que más puntos le da por lo que te cuesta cultivarla (★ = de sus favoritas), repartiendo las que tienes sin repetir más de las que hay · puntos por flor = los de la flor + el extra de sus favoritas${farm && skillRank(farm, "Blossom Bonding") ? " + Blossom Bonding" : ""} · en verde, las favoritas que tienes</span><span>Regalos: gifts.ts del juego</span></div>`;
 }
 function wGuideFlowers() {
   const view = Seg([["flowers", "Flores"], ["gifts", "Regalos a NPCs"]], S.gflView, "act").replace(/data-act="([^"]+)"/g, 'data-act="gflv:$1"');
