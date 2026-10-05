@@ -767,6 +767,8 @@ tryData("forge", () => {
 tryData("projects", () => { const src = read("types/monuments.ts"); return { cheers: tsLiteral(src, "REQUIRED_CHEERS"), rewards: tsLiteral(src, "REWARD_ITEMS") }; });
 // Ropa de cada NPC (src/lib/npcs.ts → NPC_WEARABLES): para dibujar su retrato con el mismo servicio que los Bumpkins
 tryData("npcLooks", () => tsLiteral(fs.readFileSync(path.join(gameSrc, "..", "..", "lib", "npcs.ts"), "utf8"), "NPC_WEARABLES"));
+// Pez de cada capítulo (chapters.ts → CHAPTER_MARVEL_FISH): solo se pesca mientras dura su capítulo
+tryData("chapterFish", () => tsLiteral(read("types/chapters.ts"), "CHAPTER_MARVEL_FISH"));
 // Regalos a los NPCs (types/gifts.ts): flores que les gustan más, puntos por flor y premios por amistad
 tryData("npcGifts", () => {
   const src = read("types/gifts.ts").replace(/\bBB_TO_GEM_RATIO\b/g, String(chestConsts.BB_TO_GEM_RATIO));

@@ -229,11 +229,22 @@ function wGuideFishing() {
   const caught = d.rows.filter((r) => r.caught > 0).length;
   const types = [...new Set(d.rows.map((r) => r.type))];
   const segOf = (key, cur, opts) => Seg(opts, cur, "act").replace(/data-act="([^"]+)"/g, `data-act="${key}:$1"`);
+  // Se puede pescar ya: es de esta estación (o de todo el año) y tienes alguno de sus cebos; las maravillas, con el mapa entero
+  const farm = gFarm(), season = d.season;
+  // Los del capítulo (y las maravillas de capítulo) solo salen mientras dura su capítulo
+  const ch = currentChapter();
+  const ofChapter = (r) => (r.type === "chapter" ? (G.chapterFish ? G.chapterFish[ch] === r.name : true) : G.mapPieces?.marvelChapter?.[r.name] ? G.mapPieces.marvelChapter[r.name] === ch : true);
+  const inSeason = (r) => ofChapter(r) && (!(r.seasons || []).length || r.seasons.length === 4 || r.seasons.includes(season));
+  const marvelDone = (r) => r.type !== "marine marvel" || toNum(farm?.farmActivity?.[`${r.name} Map Piece Found`]) >= MAP_PIECES_NEEDED;
+  const cards = list.map((r) => ({ ...r, can: farm ? (inSeason(r) && marvelDone(r) && (r.baits || []).some((b) => haveOf(b) > 0) ? 1 : 0) : null }))
+    .sort((a, b) => canFirst(a, b) || Number(a.caught > 0) - Number(b.caught > 0) || Object.keys(FISH_TYPE_ES).indexOf(a.type) - Object.keys(FISH_TYPE_ES).indexOf(b.type) || a.name.localeCompare(b.name));
+  const row = (icon, label, right, cls = "") => `<div>${Gi(icon, 22)}<span>${label}</span><b class="${cls}">${right}</b></div>`;
   return `<div class="kstrip">
       ${Kcell("Peces", fmt(d.rows.length, 0), types.map((t) => `${FISH_TYPE_ES[t] || t} ${d.rows.filter((r) => r.type === t).length}`).join(" · "))}
-      ${Kcell("Has pescado", gFarm() ? `${caught}<small>/ ${d.rows.length}</small>` : "—", gFarm() ? `${fmt(d.rows.reduce((s, r) => s + r.caught, 0), 0)} capturas en total` : "", "sun")}
-      ${Kcell("Lanzamientos al día", fmt(d.limit, 0), gFarm() ? "con tus boosts y carretes extra" : "base")}
-      ${Kcell("Estación", d.season ? SEASON_ES2[d.season] || d.season : "—", d.season ? "sus peces salen en verde" : "")}
+      ${Kcell("Puedes pescar ya", farm ? fmt(cards.filter((c) => c.can).length, 0) : "—", "de esta estación y con su cebo", cards.some((c) => c.can) ? "green" : "")}
+      ${Kcell("Has pescado", farm ? `${caught}<small>/ ${d.rows.length}</small>` : "—", farm ? `${fmt(d.rows.reduce((s, r) => s + r.caught, 0), 0)} capturas en total` : "", "sun")}
+      ${Kcell("Lanzamientos al día", fmt(d.limit, 0), farm ? "con tus boosts y carretes extra" : "base")}
+      ${Kcell("Estación", season ? SEASON_ES2[season] || season : "—", season ? "sus peces salen primero" : "")}
     </div>
     <div class="toolbar" style="padding:8px 12px;flex-wrap:wrap;gap:8px">
       ${view}
@@ -241,16 +252,18 @@ function wGuideFishing() {
       ${segOf("gfs", S.gfSeason, [["all", "Todo el año"], ...Object.entries(SEASON_ES2).map(([k, l]) => [k, l])])}
       ${segOf("gfb", S.gfBait, [["all", "Cualquier cebo"], ...d.baits.map((b) => [b, b])])}
     </div>
-    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Pez</th><th>Tipo</th><th>Cebo</th><th>Estaciones</th><th>Engodo más barato</th><th>Asegurado con</th><th>Suelta pieza de</th><th class="r">Pescados</th><th class="r">Precio P2P</th></tr></thead><tbody>
-    ${list.map((r) => `<tr><td class="w">${Gi(r.name, 16)} ${esc(r.name)}</td><td class="ctx">${esc(FISH_TYPE_ES[r.type] || r.type)}${r.type === "marine marvel" ? ` <span class="tag" title="Hay que juntar las piezas de su mapa">mapa</span>` : ""}</td>
-      <td class="ctx wrap">${(r.baits || []).map((b) => `${Gi(b, 12)} ${esc(b)}`).join(" ")}</td>
-      <td>${(r.seasons || []).length === 4 ? `<span class="ctx">todo el año</span>` : (r.seasons || []).map((s) => `<span class="tag${s === d.season ? " green" : ""}">${SEASON_ES2[s] || s}</span>`).join(" ") || "—"}</td>
-      <td class="ctx wrap" data-tip="${esc(`Engodo|${r.chum.map((c) => `${c.amt} ${c.item}${c.cost != null ? ` = ${fmt(c.cost, 3)} FLW` : ""}`).join(" · ") || "no le atrae nada"}|`)}">${r.bestChum ? `${Gi(r.bestChum.item, 12)} ×${r.bestChum.amt} <span class="dim">${fmt(r.bestChum.cost, 3)}</span>` : r.chum.length ? r.chum.map((c) => `${esc(c.item)} ×${c.amt}`).join(", ") : "—"}</td>
-      <td class="ctx">${r.guaranteed.map(esc).join(", ") || "—"}</td>
-      <td class="ctx">${r.piece ? `${Gi(r.piece.marvel, 12)} ${esc(r.piece.marvel)} <span class="dim">${fmt(r.piece.odds * 100, r.piece.odds < 0.01 ? 2 : 1)}%</span>` : "—"}</td>
-      <td class="r mono ${r.caught ? "" : "dim"}">${gFarm() ? compact(r.caught) : "—"}</td><td class="r mono">${r.price == null ? "—" : fmt(r.price, 3)}</td></tr>`).join("")}
-    </tbody></table></div>
-    <div class="mod-f"><span>Engodo = cuánto hay que echar de ese item para atraerlo (CHUM_AMOUNTS), valorado a floor</span><span>${list.length} peces</span></div>`;
+    <div class="cb-cards">${cards.map((r) => ItemCard({ name: r.name, can: r.can,
+      tags: `<span class="tag">${esc(FISH_TYPE_ES[r.type] || r.type)}</span>${r.caught ? `<span class="tag green">pescado ×${compact(r.caught)}</span>` : farm ? `<span class="tag sun">nuevo</span>` : ""}`,
+      sub: !ofChapter(r) ? "solo en su capítulo (ya pasó)" : r.type === "chapter" || G.mapPieces?.marvelChapter?.[r.name] ? `del capítulo en curso (${esc(ch || "")})` : (r.seasons || []).length === 4 || !(r.seasons || []).length ? "todo el año" : r.seasons.map((s) => `${SEASON_ES2[s] || s}${s === season ? " (ahora)" : ""}`).join(" · "),
+      body: `<div class="cb-ing">
+        ${(r.baits || []).map((b) => row(b, `Cebo: ${esc(b)}`, farm ? `tienes ${compact(haveOf(b))}` : "", farm ? (haveOf(b) > 0 ? "up" : "down") : "")).join("")}
+        ${r.bestChum ? row(r.bestChum.item, `Engodo: ${esc(r.bestChum.item)} · ${fmt(r.bestChum.cost, 3)} FLW`, `×${r.bestChum.amt}`, farm ? (haveOf(r.bestChum.item) >= r.bestChum.amt ? "up" : "down") : "") : ""}
+        ${r.guaranteed.length ? row(r.guaranteed[0], `Asegurado con ${r.guaranteed.map(esc).join(", ")}`, farm ? `tienes ${compact(r.guaranteed.reduce((s, g) => s + haveOf(g), 0))}` : "", farm && r.guaranteed.some((g) => haveOf(g) > 0) ? "up" : "dim") : ""}
+        ${r.piece ? row(r.piece.marvel, `Suelta pieza de ${esc(r.piece.marvel)}`, `${fmt(r.piece.odds * 100, r.piece.odds < 0.01 ? 2 : 1)}%`) : ""}
+      </div>`,
+      stats: [["Pescados", farm ? compact(r.caught) : "—"], ["Precio P2P", r.price == null ? "—" : fmt(r.price, 3)], ["Ahora", inSeason(r) ? "en temporada" : "fuera", inSeason(r) ? "up" : "dim"]],
+    })).join("")}</div>
+    <div class="mod-f"><span>Primero lo que puedes pescar ya (de esta estación y con su cebo; las maravillas, con el mapa completo), y entre ellos los que aún no has pescado · engodo = cuánto hay que echar para atraerlo, a floor</span><span>${list.length} peces</span></div>`;
 }
 ACTIONS.gfv = (v) => { S.gfView = v; writeLS("gfView", v); rerun(); };
 ACTIONS.gft = (v) => { S.gfType = v; writeLS("gfType", v); rerun(); };

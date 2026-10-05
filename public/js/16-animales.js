@@ -158,23 +158,27 @@ function animalAdvice(a, cure) {
 function wAnimalHouses() {
   const m = animalModel();
   if (!m.houses.length) return Empty("chicken", "Sin animales", "");
-  return m.houses.map((h) => `<div class="grp">${esc(h.label)} · ${h.rows.length} animales · <span class="${tone(h.perDay)}">${signed(h.perDay, 3)}</span> FLOWER al día</div>${animalHouseTable(h, m)}`).join("");
+  return m.houses.map((h) => `<div class="grp">${esc(h.label)} · ${h.rows.length} animales · <span class="${tone(h.perDay)}">${signed(h.perDay, 3)}</span> FLOWER al día</div>${animalHouseCards(h, m)}`).join("");
 }
-function animalHouseTable(h, m) {
+// Tarjeta por animal; primero lo que puedes hacer ya: recoger, darle de comer (si tienes su comida), acariciarlo o curarlo
+function animalHouseCards(h, m) {
   const t = now();
-  return `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Animal</th><th>Estado</th><th class="r" data-tip="Para producir|XP que le falta para subir de nivel (o completar el ciclo en el máximo) y cuánta comida es|" tabindex="0">Para producir</th>
-    <th class="r">Da al producir</th><th class="r">Comida del ciclo</th><th class="r">Al día${Legend("profit")}</th><th>Consejo</th></tr></thead><tbody>
-    ${h.rows.map((a) => {
-      const state = a.sick ? `<span class="tag red">enfermo</span>` : a.ready ? `<span class="tag green">listo</span>` : a.asleep ? `<span class="tag">duerme</span> <span class="ctx">${dur(a.awakeAt - t)}</span>` : `<span class="tag sun">con hambre</span>`;
-      const prod = a.produce.map((p) => `${Gi(p.item, 14)} ${fmt(p.amt, 2)}`).join(" ") || "—";
-      return `<tr><td>${Gi(a.type, 18)} ${ANIMAL_ES[a.type] || a.type} <span class="dim">nv ${a.L}</span></td><td>${state}</td>
-        <td class="r mono">${fmt(a.toGo, 0)} XP${a.lovesLeft ? `<div class="ctx${a.canLove ? " sun-t" : ""}">${a.canLove ? "caricia ya" : `caricia en ${dur(a.nextLoveAt - t)}`}: +${fmt(a.love, 0)} XP · ${esc(a.item || "Petting Hand")}${a.hasTool ? "" : " (no la tienes)"}</div>` : ""}
-          <div class="ctx">${a.free ? "come gratis" : a.feedsNow ? `${a.lovesLeft && a.hasTool ? "luego " : ""}${fmt(a.foodNow, 2)} ${esc(a.fav)}` : "le bastan las caricias"}</div></td>
-        <td class="r mono">${prod}<div class="ctx">${a.value == null ? "sin precio" : `${fmt(a.value, 3)} FLOWER`}</div></td>
-        <td class="r mono">${a.cycleCost == null ? "—" : fmt(a.cycleCost, 3)}<div class="ctx">${a.feedsCycle} toma${a.feedsCycle > 1 ? "s" : ""} × ${a.qty}${a.mult !== 1 ? ` × ${fmt(a.mult, 2)}` : ""}</div></td>
-        <td class="r mono ${tone(a.perDay)}"><b>${a.perDay == null ? "—" : signed(a.perDay, 3)}</b></td><td>${animalAdvice(a, m.cureCost)}</td></tr>`;
-    }).join("")}</tbody></table></div>
-    <div class="mod-f"><span>Un ciclo = de un nivel al siguiente con su comida favorita; duerme ${fmt(h.rows[0]?.sleepH ?? 24, 1)} h y lo recoges según tu ritmo (cada ${S.visitH} h)</span><span>con ${h.rows[0]?.lovesCycle ?? 0} caricia${h.rows[0]?.lovesCycle === 1 ? "" : "s"} por noche (lo que te deja tu ritmo) · sin animales mutantes</span></div>`;
+  const todo = (a) => (a.ready ? 4 : a.canLove && a.hasTool ? 3 : a.hungry && (a.free || haveOf(a.fav) >= a.foodNow) ? 2 : a.sick ? 1 : 0);
+  const rows = h.rows.map((a) => ({ ...a, can: todo(a) })).sort((x, y) => y.can - x.can || x.awakeAt - y.awakeAt);
+  return `<div class="cb-cards">${rows.map((a) => {
+    const state = a.sick ? `<span class="tag red">enfermo</span>` : a.ready ? `<span class="tag green">listo para recoger</span>` : a.asleep ? `<span class="tag">duerme · ${dur(a.awakeAt - t)}</span>` : `<span class="tag sun">con hambre</span>`;
+    const lines = [];
+    if (a.hungry || a.ready) lines.push(a.free ? `<div>${Gi(a.fav, 22)}<span>Come gratis</span><b class="up">✓</b></div>`
+      : a.feedsNow ? `<div title="tienes ${fmt(haveOf(a.fav), 1)}">${Gi(a.fav, 22)}<span>Darle ${esc(a.fav)}</span><b class="${haveOf(a.fav) >= a.foodNow ? "up" : "down"}">×${fmt(a.foodNow, 2)}</b></div>` : `<div><span>Le bastan las caricias</span></div>`);
+    if (a.lovesLeft) lines.push(`<div>${Gi(a.item || "Petting Hand", 22)}<span>${a.canLove ? "Caricia ya" : `Caricia en ${dur(a.nextLoveAt - t)}`} · ${esc(a.item || "Petting Hand")}</span><b class="${a.hasTool ? (a.canLove ? "up" : "") : "down"}">+${fmt(a.love, 0)} XP</b></div>`);
+    lines.push(...a.produce.map((p) => `<div>${Gi(p.item, 22)}<span>Da ${esc(p.item)}</span><b>×${fmt(p.amt, 2)}</b></div>`));
+    return ItemCard({ name: `${ANIMAL_ES[a.type] || a.type} · nivel ${a.L}`, icon: a.type, can: a.can,
+      tags: state, sub: animalAdvice(a, m.cureCost).replace(/<div class="ctx">/g, " · <span class=\"ctx\">").replace(/<\/div>/g, "</span>") || `${fmt(a.toGo, 0)} XP para producir`,
+      body: `<div class="cb-ing">${lines.join("")}</div>`,
+      stats: [["Para producir", `${fmt(a.toGo, 0)} XP`], ["Comida del ciclo", a.cycleCost == null ? "—" : fmt(a.cycleCost, 3)], ["Vale", a.value == null ? "—" : fmt(a.value, 3)], ["Al día", a.perDay == null ? "—" : signed(a.perDay, 3), tone(a.perDay)]],
+    });
+  }).join("")}</div>
+    <div class="mod-f"><span>Primero lo que puedes hacer ya: recoger, darle de comer (si tienes su comida), acariciarlo o curarlo · un ciclo = de un nivel al siguiente con su comida favorita; duerme ${fmt(h.rows[0]?.sleepH ?? 24, 1)} h y lo recoges según tu ritmo (cada ${S.visitH} h)</span><span>con ${h.rows[0]?.lovesCycle ?? 0} caricia${h.rows[0]?.lovesCycle === 1 ? "" : "s"} por noche · sin animales mutantes</span></div>`;
 }
 
 PAGES.animals = function animals() {
