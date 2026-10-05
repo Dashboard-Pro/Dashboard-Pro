@@ -323,19 +323,24 @@ function npcGiftModel() {
   }).sort((a, b) => b.ready - a.ready || (a.toGo ?? 1e9) - (b.toGo ?? 1e9));
 }
 function wGuideGifts() {
-  const list = npcGiftModel(), farm = gFarm();
-  const giftTxt = (x) => [x.coins ? `${Gi("Coins", 12, "coin")} ${compact(x.coins)}` : "", ...Object.entries(x.items || {}).map(([k, q]) => `${Gi(k, 12)} ${q > 1 ? fmt(q, 0) + " " : ""}${esc(k)}`),
-    ...Object.keys(x.wearables || {}).map((k) => `${Gi(k, 12)} ${esc(k)}`), x.recipe ? `receta: ${esc(x.recipe)}` : ""].filter(Boolean).join(" · ") || "—";
-  const favTxt = (f) => `<span style="margin-right:6px" class="${f.have ? "up" : ""}">${Gi(f.f, 12)} ${esc(f.f)} +${f.pts}</span>`;
-  return `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>NPC</th><th class="r">Amistad</th><th>Siguiente regalo</th><th class="r">Faltan</th><th>Flores que más le gustan</th><th>Lo mejor que tienes</th></tr></thead><tbody>
-    ${list.map((n) => `<tr><td class="w">${esc(NPC_ES(n.npc))}${n.ready ? ` <span class="tag green">regalo listo</span>` : ""}${n.giftedToday ? ` <span class="tag">flor hoy</span>` : ""}</td>
-      <td class="r mono">${farm ? fmt(n.points, 0) : "—"}</td>
-      <td class="ctx wrap">${n.next ? `<b>${fmt(n.next.friendshipPoints, 0)}</b> · ${giftTxt(n.next)}` : "no da regalos"}</td>
-      <td class="r mono">${n.toGo == null || !farm ? "—" : n.toGo ? `${fmt(n.toGo, 0)}<div class="faint">≈ ${n.flowersNeeded} flores</div>` : "✓"}</td>
-      <td class="ctx wrap">${n.fav.slice(0, 5).map(favTxt).join("") || `<span class="faint">cualquier flor</span>`}${n.fav.length > 5 ? ` <span class="faint">+${n.fav.length - 5} más</span>` : ""}</td>
-      <td class="ctx">${n.mine ? `${Gi(n.mine.f, 12)} ${esc(n.mine.f)} +${n.mine.pts} <span class="faint">(tienes ${fmt(n.mine.have, 0)})</span>` : "—"}</td></tr>`).join("")}
-  </tbody></table></div>
-  <div class="mod-f"><span>Puntos por flor = los de la flor + el extra de sus favoritas${farm && skillRank(farm, "Blossom Bonding") ? " + Blossom Bonding" : ""} · en verde, las favoritas que tienes</span><span>Regalos: gifts.ts del juego</span></div>`;
+  const farm = gFarm();
+  const giftTxt = (x) => [x.coins ? `${Gi("Coins", 14, "coin")} ${compact(x.coins)}` : "", ...Object.entries(x.items || {}).map(([k, q]) => `${Gi(k, 14)} ${q > 1 ? fmt(q, 0) + " " : ""}${esc(k)}`),
+    ...Object.keys(x.wearables || {}).map((k) => `${Gi(k, 14)} ${esc(k)}`), x.recipe ? `receta: ${esc(x.recipe)}` : ""].filter(Boolean).join(" · ") || "—";
+  const giftIcon = (x) => Object.keys(x?.items || {})[0] || Object.keys(x?.wearables || {})[0] || (x?.coins ? "Coins" : null);
+  // Puedes hacer algo hoy: recoger el regalo o darle una flor (si aún no le has dado hoy y tienes alguna)
+  const list = npcGiftModel().map((n) => ({ ...n, can: n.ready || (farm && !n.giftedToday && n.mine) ? 1 : 0 }))
+    .sort((a, b) => b.ready - a.ready || canFirst(a, b) || (a.toGo ?? 1e9) - (b.toGo ?? 1e9));
+  const favRows = (n) => `<div class="cb-ing">${n.fav.slice(0, 6).map((f) => `<div title="${farm ? `tienes ${fmt(f.have, 0)}` : ""}">${Gi(f.f, 22)}<span>${esc(f.f)}</span><b class="${!farm ? "" : f.have ? "up" : "dim"}">+${f.pts}</b></div>`).join("")
+    || `<div class="ctx">Le vale cualquier flor (+${n.fav[0]?.pts || 3} puntos)</div>`}${n.fav.length > 6 ? `<div class="faint">+${n.fav.length - 6} flores más que le gustan</div>` : ""}</div>`;
+  return `<div class="cb-cards">${list.map((n) => ItemCard({
+      name: NPC_ES(n.npc), icon: giftIcon(n.next) || n.fav[0]?.f || "Red Pansy", can: n.can,
+      tags: `${n.ready ? `<span class="tag green">regalo listo</span>` : ""}${n.giftedToday ? `<span class="tag">flor hoy ✓</span>` : ""}`,
+      sub: n.next ? `Siguiente regalo a ${fmt(n.next.friendshipPoints, 0)}: ${giftTxt(n.next)}` : "no da regalos",
+      body: favRows(n),
+      stats: [["Amistad", farm ? fmt(n.points, 0) : "—"], ["Faltan", n.toGo == null || !farm ? "—" : n.toGo ? `${fmt(n.toGo, 0)} · ≈${n.flowersNeeded} flores` : "✓", n.toGo === 0 ? "up" : ""],
+        ["Lo mejor que tienes", n.mine ? `${esc(n.mine.f)} +${n.mine.pts}` : "—", n.mine && !n.giftedToday ? "up" : "dim"]],
+    })).join("")}</div>
+  <div class="mod-f"><span>Primero los que tienen el regalo listo y a los que puedes dar una flor hoy · puntos por flor = los de la flor + el extra de sus favoritas${farm && skillRank(farm, "Blossom Bonding") ? " + Blossom Bonding" : ""} · en verde, las favoritas que tienes</span><span>Regalos: gifts.ts del juego</span></div>`;
 }
 function wGuideFlowers() {
   const view = Seg([["flowers", "Flores"], ["gifts", "Regalos a NPCs"]], S.gflView, "act").replace(/data-act="([^"]+)"/g, 'data-act="gflv:$1"');
