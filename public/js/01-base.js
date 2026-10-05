@@ -271,6 +271,9 @@ const Star = (key) => `<button class="star${S.watch.has(key) ? " on" : ""}" data
 
 const Seg = (items, active, attr) =>
   `<div class="seg">${items.map(([v, l]) => `<button data-${attr}="${v}" class="${String(v) === String(active) ? "on" : ""}">${l}</button>`).join("")}</div>`;
+// Igual que Seg, pero el clic va a ACTIONS[action](valor) (data-act): no hace falta registrar un atributo nuevo
+const SegAct = (items, active, action) =>
+  `<div class="seg">${items.map(([v, l]) => `<button data-act="${action}:${v}" class="${String(v) === String(active) ? "on" : ""}">${l}</button>`).join("")}</div>`;
 
 function Loading(kind = "block", n = 6) {
   if (kind === "rows") return Array.from({ length: n }, (_, i) => `<div class="sk-row"><span class="sk"></span><span class="sk" style="width:${55 + ((i * 37) % 40)}%"></span><span class="sk"></span></div>`).join("");

@@ -28,6 +28,8 @@ const NEEDED = [
   "types/megastore.ts", "types/tracks.ts", "types/collections.ts", "types/chapterMutants.ts", "lib/crafting.ts", "types/factionShop.ts",
   "types/withdrawables.ts", "events/landExpansion/upgradeBuilding.ts", "types/composters.ts", "events/landExpansion/startLavaPit.ts",
   "types/floatingIsland.ts", "types/collectibles.ts", "types/calendar.ts", "events/landExpansion/buyResource.ts", "types/gifts.ts",
+  "types/monuments.ts", "types/petShop.ts", "types/resources.ts",
+  "types/fermentation.ts", "types/spiceRack.ts", "types/fishProcessing.ts", "types/crustaceans.ts",
 ].map((f) => `src/features/game/${f}`).concat(["src/lib/i18n/dictionaries/es.json", "src/lib/i18n/dictionaries/en.json", "src/features/pets/data/pets-nfts.ts",
   "src/assets/sunnyside.ts", "src/features/island/plots/lib/plant.ts", "src/features/island/delivery/lib/delivery.ts"]);
 
@@ -152,6 +154,8 @@ for (const m of skillBody.matchAll(/^ {2}(?:"([^"]+)"|([A-Za-z0-9_]+)):\s*{([\s\
     buffEn: dictEn[get(/\bbuff:\s*{[\s\S]*?shortDescription:\s*translate\("([^"]+)"\)/)] || get(/\bbuff:\s*{[\s\S]*?shortDescription:\s*"([^"]+)"/) || undefined,
     // Valores por nivel de las skills mejorables (upgrade.effect.ranks), si son una lista de números
     ranks: (() => { const r = get(/upgrade:[\s\S]*?\branks:\s*\[([\d.,\s]+)\]/); return r ? r.split(",").map(Number).filter(Number.isFinite) : undefined; })(),
+    // Rango máximo de las skills mejorables (con Ascension Shards), tengan o no valores numéricos por rango
+    maxLevel: Number(get(/upgrade:\s*{\s*maxLevel:\s*(\d+)/)) || undefined,
     debuff: tr(get(/debuff:\s*{[\s\S]*?shortDescription:\s*translate\("([^"]+)"\)/)) || get(/debuff:\s*{[\s\S]*?shortDescription:\s*"([^"]+)"/) || undefined,
   };
 }
@@ -160,6 +164,8 @@ const skillTiers = {};
 for (const m of tierBody.matchAll(/^ {2}(?:"([^"]+)"|([A-Za-z]+)):\s*{\s*1:\s*(\d+),\s*2:\s*(\d+),\s*3:\s*(\d+),?\s*}/gm)) {
   skillTiers[m[1] ?? m[2]] = { 1: Number(m[3]), 2: Number(m[4]), 3: Number(m[5]) };
 }
+// Subir de rango una skill (getSkillUpgradeCost): puntos según su tier y tantos Ascension Shards como su tier
+const skillUpgradePoints = tsLiteral(read("types/bumpkinSkills.ts"), "UPGRADE_POINTS_BY_TIER");
 
 // ── Misiones: tickets por NPC, capítulos, boosts, tareas ────────────────────
 const deliverSrc = read("events/landExpansion/deliver.ts");
@@ -267,7 +273,8 @@ const toolsSrc = read("types/tools.ts");
 for (const name of ["WORKBENCH_TOOLS", "TREASURE_TOOLS", "LOVE_ANIMAL_TOOLS"]) {
   for (const m of block(toolsSrc, name).matchAll(/^ {2}(?:"([^"]+)"|([A-Za-z]+)):\s*{([\s\S]*?)^ {2}},?/gm)) {
     const b = m[3];
-    const ing = b.match(/ingredients:[\s\S]*?\(\{([\s\S]*?)\}\)/);
+    // ingredients: () => ({…}) o, si depende de una skill (Oil Drill), el último `return {…}` = la receta sin la skill
+    const ing = b.match(/ingredients:\s*\([^)]*\)\s*=>\s*\(\{([\s\S]*?)\}\)/) || [...b.matchAll(/return\s*\{([^{}]*)\}/g)].at(-1);
     recipes[m[1] ?? m[2]] = { coins: Number(b.match(/price:\s*([\d.]+)/)?.[1] || 0), items: ing ? decimals(ing[1]) : {} };
   }
 }
@@ -696,6 +703,68 @@ tryData("expansionNodes", () => {
   }
   return out;
 });
+// Santuarios (pets.ts → PET_SHRINES + el Obsidian Shrine de petShop.ts): lo que piden para construirlos o renovarlos
+tryData("shrines", () => {
+  const out = {};
+  for (const m of block(read("types/pets.ts"), "PET_SHRINES").matchAll(/^ {2}"([^"]+)":\s*{([\s\S]*?)^ {2}},?/gm)) {
+    out[m[1]] = { coins: Number(m[2].match(/coins:\s*([\d_]+)/)?.[1]?.replace(/_/g, "") || 0), items: decimals(m[2].match(/ingredients:\s*{([\s\S]*?)}/)?.[1] || "") };
+  }
+  const shop = read("types/petShop.ts").match(/"Obsidian Shrine":\s*{([\s\S]*?)^ {2}},?/m);
+  if (shop) out["Obsidian Shrine"] = { coins: 0, items: decimals(shop[1].match(/ingredients:\s*{([\s\S]*?)}/)?.[1] || "") };
+  return out;
+});
+// Recetas con { durationSeconds, ingredients, outputs } (fermentación, especiero): entradas a 2 espacios dentro del bloque
+function timedRecipes(src, name, consts = {}) {
+  const out = {};
+  for (const m of block(src, name).matchAll(/^ {2}(?:"([^"]+)"|([A-Za-z]+)):\s*{([\s\S]*?)^ {2}},?/gm)) {
+    const b = m[3];
+    let expr = b.match(/durationSeconds:\s*([^,\n]+)/)?.[1] || "0";
+    for (const [k, v] of Object.entries(consts)) expr = expr.replace(new RegExp(`\\b${k}\\b`, "g"), String(v));
+    if (!/^[\d\s*+()./-]+$/.test(expr)) continue;
+    out[m[1] ?? m[2]] = { secs: Function(`return (${expr})`)(), items: decimals(b.match(/ingredients:\s*{([\s\S]*?)}/)?.[1] || ""), out: decimals(b.match(/outputs:\s*{([\s\S]*?)}/)?.[1] || "") };
+  }
+  return out;
+}
+// Utilidades del aging shed y del muelle: fermentación, especiero, procesado de pescado, trampas de crustáceos y la XP de
+// cada pez (para envejecerlo: agingBase.ts lo calcula a partir de ella)
+tryData("utilities", () => {
+  const ferm = read("types/fermentation.ts"), spice = read("types/spiceRack.ts"), proc = read("types/fishProcessing.ts"), crus = read("types/crustaceans.ts");
+  const seasonal = {};
+  for (const [item, cst] of [["Fish Flake", "FISH_FLAKE_SEASONAL"], ["Fish Stick", "FISH_STICK_SEASONAL"], ["Fish Oil", "FISH_OIL_SEASONAL"], ["Crab Stick", "CRAB_STICK_SEASONAL"]]) {
+    seasonal[item] = Object.fromEntries([...block(proc, cst).matchAll(/^ {2}(\w+):\s*{([\s\S]*?)^ {2}},?/gm)].map((m) => [m[1], decimals(m[2])]));
+  }
+  const base = Object.fromEntries([...block(proc, "BASE_PROCESSING_REQUIREMENTS").matchAll(/^ {2}"([^"]+)":\s*{([\s\S]*?)^ {2}},?/gm)].map((m) => [m[1], decimals(m[2])]));
+  const procTime = Object.fromEntries([...block(proc, "FISH_PROCESSING_TIME_SECONDS").matchAll(/"([^"]+)":\s*([\d\s*]+)/g)].map((m) => [m[1], Function(`return (${m[2]})`)()]));
+  const lookup = {};
+  for (const m of block(crus, "CRUSTACEANS_LOOKUP").matchAll(/^ {2}"([^"]+)":\s*{([\s\S]*?)^ {2}},?/gm)) {
+    lookup[m[1]] = Object.fromEntries([...m[2].matchAll(/(?:"([^"]+)"|(\w+)):\s*"([^"]+)"/g)].map((x) => [x[1] ?? x[2], x[3]]));
+  }
+  const chums = {};
+  for (const [trap, cst] of [["Crab Pot", "CRAB_POT_CHUMS"], ["Mariner Pot", "MARINER_POT_CHUMS"]]) chums[trap] = Object.fromEntries([...block(crus, cst).matchAll(/(?:"([^"]+)"|(\w+)):\s*(\d+)/g)].map((x) => [x[1] ?? x[2], Number(x[3])]));
+  const hours = Object.fromEntries([...block(crus, "WATER_TRAP").matchAll(/"([^"]+)":\s*{\s*readyTimeHours:\s*(\d+)/g)].map((m) => [m[1], Number(m[2])]));
+  const fishXp = Object.fromEntries([...block(consSrc, "FISH").matchAll(/^ {2}(?:"([^"]+)"|(\w+)):\s*{[\s\S]*?experience:\s*([\d_]+)/gm)].map((m) => [m[1] ?? m[2], Number(m[3].replace(/_/g, ""))]));
+  return {
+    fermentation: timedRecipes(ferm, "STATIC_FERMENTATION_RECIPES", { GREENHOUSE_FERMENT_DURATION_SEC: 7200 }),
+    spice: timedRecipes(spice, "SPICE_RACK_RECIPES_STATIC"),
+    processing: { secs: procTime, base, seasonal },
+    crustaceans: { lookup, chums, hours },
+    fishXp,
+  };
+});
+// Forja de nodos (resources.ts → ADVANCED_RESOURCES): 4 nodos del tier anterior + obsidian + coins → tier 2/3,
+// que da RESOURCE_MULTIPLIER veces lo de un nodo y +0,5 / +2,5 por golpe (chop.ts / stoneMine.ts)
+tryData("forge", () => {
+  const src = read("types/resources.ts"), out = {};
+  for (const m of block(src, "ADVANCED_RESOURCES").matchAll(/^ {2}"([^"]+)":\s*{([\s\S]*?)^ {2}},?/gm)) {
+    const ing = decimals(m[2].match(/ingredients:\s*\(\)\s*=>\s*\(\{([\s\S]*?)\}\)/)?.[1] || "");
+    const from = Object.keys(ing).find((k) => k !== "Obsidian");
+    out[m[1]] = { tier: Number(m[2].match(/tier:\s*(\d)/)[1]), coins: Number(m[2].match(/price:\s*([\d_]+)/)[1].replace(/_/g, "")), from, count: ing[from], obsidian: ing.Obsidian || 0 };
+  }
+  const per = Number(src.match(/REQUIRED_NODES_TO_FORGE\s*=\s*(\d+)/)?.[1] || 4);
+  return { nodes: out, multiplier: { 1: 1, 2: per, 3: per * per }, bonus: { 2: 0.5, 3: 2.5 } };
+});
+// Proyectos del pueblo (monuments.ts): ánimos que pide cada uno y lo que da al completarlo (fruta gigante, cajas de comida)
+tryData("projects", () => { const src = read("types/monuments.ts"); return { cheers: tsLiteral(src, "REQUIRED_CHEERS"), rewards: tsLiteral(src, "REWARD_ITEMS") }; });
 // Regalos a los NPCs (types/gifts.ts): flores que les gustan más, puntos por flor y premios por amistad
 tryData("npcGifts", () => {
   const src = read("types/gifts.ts").replace(/\bBB_TO_GEM_RATIO\b/g, String(chestConsts.BB_TO_GEM_RATIO));
@@ -743,6 +812,7 @@ const data = {
   },
   skills,
   skillTiers,
+  skillUpgradePoints,
   ticketRewards,
   chapters,
   chapterBoosts,

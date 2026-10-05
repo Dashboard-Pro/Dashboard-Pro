@@ -80,9 +80,35 @@ async function uiChecks() {
   // Con el idioma ya elegido, la primera vez arranca la mini guía por el dashboard
   const tourDom = await dumpDom(browser, `${base}/?lang=es#overview`, path.join(tmp, "ui-tour"));
   ok(tourDom.includes('id="tour"') && tourDom.includes("Saltar guía"), "primera vez: mini guía después de elegir idioma");
+  // Skills: módulo de subir de rango con los Ascension Shards del jugador
+  // Comprobaciones de contenido: como las páginas, un fallo suelto de carga se repite una vez
+  const domCheck = async (hash, profile, test) => {
+    const d = await dumpDom(browser, `${base}/?lang=es#${hash}`, path.join(tmp, profile));
+    return test(d) || test(await dumpDom(browser, `${base}/?lang=es#${hash}`, path.join(tmp, `${profile}-2`)));
+  };
+  ok(await domCheck("skills", "ui-skranks", (sk) => sk.includes('id="sk-ranks"') && /6 Ascension Shards · \d+ pts? libres/.test(sk) && sk.includes("puedes subirla a rango 2")), "skills: subir de rango con Ascension Shards");
+  // Resumen: proyectos del pueblo (Big Orange 25/25 = listo para recoger) y lo que vale lo que está listo
+  ok(await domCheck("overview", "ui-ovproj", (ov) => /id="ov-projects"[\s\S]*Big Orange[\s\S]*¡Listo! recógelo/.test(ov) && ov.includes('id="ov-temps"') && /a precio de mercado/.test(ov)), "resumen: proyectos del pueblo, temporales y valor de lo listo");
+  // Expansiones: calculadora con el mapa de parcelas y la tabla de lo que falta
+  ok(await domCheck("gexpand", "ui-gexpand", (gx) => /class="xmap"/.test(gx) && /data-act="get:\d+"/.test(gx) && gx.includes("Nodos que ganas") && /<b>1<\/b>/.test(gx)), "expansiones: mapa de parcelas y calculadora");
   // Otra granja en solo lectura (?farm=ID): se dibuja con el aviso y la opción de volver a la tuya
   const other = await dumpDom(browser, `${base}/?farm=555#dig`, path.join(tmp, "ui-view"));
   ok(other.includes('data-drawn="dig"') && /id="viewBanner" class="view-banner"(?! hidden)[^>]*>[\s\S]*#555/.test(other) && !/data-js-errors="\d+"/.test(other), "ver otra granja (?farm=): aviso de solo lectura");
+}
+
+// ── 0. Nombres repetidos entre scripts: comparten el ámbito global y el último pisa al otro sin avisar ──
+{
+  const seen = {}, dup = [];
+  for (const file of fs.readdirSync(path.join(root, "public/js")).filter((x) => x.endsWith(".js"))) {
+    const src = fs.readFileSync(path.join(root, "public/js", file), "utf8");
+    for (const m of src.matchAll(/^(?:async )?function (\w+)|^(?:const|let|var) (\w+)\s*=/gm)) {
+      const n = m[1] || m[2];
+      if (seen[n] && seen[n] !== file) dup.push(`${n} (${seen[n]} y ${file})`);
+      else seen[n] = file;
+    }
+  }
+  section("Scripts");
+  ok(!dup.length, `sin nombres globales repetidos entre archivos${dup.length ? `: ${dup.join(", ")}` : ""}`);
 }
 
 // ── 1. Datos del juego ────────────────────────────────────────────────────────
@@ -155,6 +181,12 @@ ok(Object.values(G.chapterArtefact || {}).includes("Otter Pebble"), "artefacto d
   const t0 = Date.now(), early = digSolve({ patterns, holes: holes.slice(0, 3) });
   ok(!early.impossible && Date.now() - t0 < 3000 && Math.abs(early.cells.reduce((a, c) => a + c.chance, 0) - total) < 1e-6, "excavación: rápido con pocos hoyos (aproximado)");
   ok(digSolve({ patterns, holes: [{ x: 0, y: 0, item: "Pirate Bounty" }] }).impossible, "excavación: detecta datos que no encajan");
+  // Sitio real del 03-10-2026: 8 patrones y demasiadas combinaciones; el muestreo a ciegas no encontraba ninguna ("no encajan")
+  const p8 = ["ARTEFACT_SIXTEEN", "ARTEFACT_TWENTY_THREE", "ARTEFACT_TWENTY_FOUR", "HIEROGLYPH", "HIEROGLYPH", "SEA_CUCUMBERS", "COCKLE", "CLAM_SHELLS"]
+    .map((name) => ({ name, cells: digShape(G.diggingFormations[name], "Otter Pebble") }));
+  const h8 = [[3, 2, "Vase"], [3, 3, "Hieroglyph"], [4, 1, "Camel Bone"], [5, 1, "Crab"], [3, 0, "Otter Pebble"], [3, 5, "Crab"], [4, 5, "Crab"], [3, 6, "Crab"], [4, 6, "Camel Bone"], [4, 4, "Sea Cucumber"]].map(([x, y, item]) => ({ x, y, item }));
+  const r8 = digSolve({ patterns: p8, holes: h8 });
+  ok(!r8.impossible && Math.abs(r8.cells.reduce((a, c) => a + c.chance, 0) - 30) < 1e-6 && r8.cells[4].chance === 1, "excavación: muchas combinaciones (muestreo guiado por las pistas)");
   // Skills a su nivel: el valor de nivel N con la misma forma que el texto del juego (nivel 1)
   const { rankValue } = require("../public/js/14-herramientas.js");
   const near = (a, b) => Math.abs(a - b) < 1e-9;
@@ -175,6 +207,8 @@ ok(G.cropMachineSeeds?.basic?.includes("Sunflower Seed") && Object.keys(G.cropMa
 }
 ok(G.animals?.levels?.Chicken?.[1] > 0 && G.animals.foodXp?.Chicken?.[0]?.Hay > 0 && G.animals.drops?.Cow?.[5]?.Milk > 0 && G.animals.requiredQty?.Cow === 5, "reglas de animales (niveles, XP de comida, producción, raciones)");
 ok(G.animals?.foods?.["Barn Delight"]?.ingredients?.Lemon > 0 && G.animals.sleepHours > 0, "comida, medicina y sueño de los animales");
+ok(G.skillUpgradePoints?.[1] === 1 && G.skillUpgradePoints[3] === 6 && G.skills?.["Chonky Scarecrow"]?.maxLevel === 3 && Object.values(G.skills).filter((s) => s.maxLevel > 1).length > 100,
+  "rangos de las skills (máximo y puntos por subir con Ascension Shards)");
 ok(G.skills?.["Nom Nom"]?.ranks?.length === 3 && G.skills["Betty's Friend"].ranks[0] > 0, "valores por nivel de las skills (boosts de entrega)");
 ok(Object.keys(G.itemDims || {}).length > 300 && G.itemDims["Hen House"]?.[0] > 1, "tamaño de edificios y decoración (mapa)");
 ok(G.chests?.BASIC_REWARDS?.length > 10 && G.chests.LUXURY_REWARDS?.every((r) => r.weighting > 0) && G.chests.BASIC_REWARDS.some((r) => r.items?.Gem > 0), "premios y pesos de los cofres");

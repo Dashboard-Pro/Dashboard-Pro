@@ -29,7 +29,7 @@ function wBoard() {
   setSub("fm-board", `${readyN} listos · ${list.length - readyN} en curso${S.farmFilter ? ` · ${CATS[S.farmFilter].label}` : ""}`);
   if (!groups.length) return Empty("sprout", "Nada por aquí", "No hay temporizadores en esta categoría.");
   return `<div class="tbl-wrap board"><table class="tbl"><thead><tr><th></th><th>Qué</th><th>Progreso</th><th class="r">Hora</th><th class="r">Falta</th></tr></thead><tbody>
-    ${shown.map((g) => `<tr class="${g.ready <= t ? "ready" : ""}"><td class="ic">${sprite(CATS[g.cat].spr, 16)}</td>
+    ${shown.map((g) => `<tr class="${g.ready <= t ? "ready" : ""}"><td class="ic">${timerIcon(g, 16)}</td>
       <td><div class="name"><span>${esc(g.name)}</span>${g.count > 1 ? `<span class="tag">×${g.count}</span>` : ""}${g.note ? `<span class="dim">${esc(g.note)}</span>` : ""}</div></td>
       <td class="bar">${Bar(g.start, g.ready, CATS[g.cat].color)}</td>
       <td class="r dim">${at(g.ready)}</td><td class="r">${g.ready <= t ? `<span class="ok-tag">LISTO</span>` : Cd(g.ready)}</td></tr>`).join("")}
@@ -40,7 +40,8 @@ function wBoard() {
 function notifyToggle() {
   const ok = "Notification" in window;
   return `<label class="toggle" title="${ok ? "Notificación del navegador cuando algo madure" : "Tu navegador no soporta notificaciones"}">
-    <input type="checkbox" id="notifyToggle" ${S.notify ? "checked" : ""} ${ok ? "" : "disabled"} /><i></i>Avisos</label>`;
+    <input type="checkbox" id="notifyToggle" ${S.notify ? "checked" : ""} ${ok ? "" : "disabled"} /><i></i>Avisos</label>
+    ${SegAct([[0, "al momento"], [5, "5 min antes"], [15, "15 min"], [30, "30 min"]], S.notifyEarly, "notifyearly")}`;
 }
 
 /* ── Widgets de Mercado ─────────────────────────────────────────────────── */

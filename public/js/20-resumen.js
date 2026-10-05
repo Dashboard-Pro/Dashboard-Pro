@@ -57,6 +57,12 @@ function checklistModel() {
     const fed = fm.fac.pet.requests.filter((q) => Object.values(q.dailyFulfilled || {}).some((v) => toNum(v) > 0)).length;
     add(fed === fm.petReq.length ? "ok" : "todo", "paw", "Mascota de facción", `${fed} de ${fm.petReq.length} pedidos esta semana${fm.fac.pet.qualifiesForBoost ? " · boost conseguido" : ""}`, "faction");
   }
+  // Santuarios caducados, Maneki Neko sin agitar y proyectos completos por recoger
+  const tm = tempsModel(), expired = tm.shrines.filter((x) => x.expired);
+  if (tm.shrines.length) add(expired.length ? "warn" : "ok", "bolt", "Santuarios", expired.length ? `caducado: ${expired.map((x) => x.name.replace(/ Shrine$/, "")).join(", ")}` : `${tm.shrines.length} activo${tm.shrines.length > 1 ? "s" : ""} · el primero acaba en ${dur(tm.shrines[0].left)}`);
+  if (tm.maneki.length) add(tm.maneki.every((k) => k.shaken) ? "ok" : "todo", "chest", "Maneki Neko", tm.maneki.every((k) => k.shaken) ? "agitado hoy" : "agítalo: una comida gratis");
+  const pj = projectsModel(), toClaim = pj.filter((p) => p.done && p.reward);
+  if (pj.length) add(toClaim.length ? "todo" : "info", "hammer", "Proyectos del pueblo", toClaim.length ? `listo para recoger: ${toClaim.map((p) => p.name).join(", ")}` : `${pj.filter((p) => p.done).length} / ${pj.length} completados`);
   // Protecciones contra el clima
   for (const [item, , label] of WEATHER_GUARD) {
     const have = toNum(farm.inventory?.[item]) > 0;
@@ -173,4 +179,69 @@ function wShopStock() {
   return `<h4 class="acc-h">Herramientas</h4><div class="st-grid">${tools.map(cell).join("")}</div>
     <h4 class="acc-h">Semillas de esta estación</h4><div class="st-grid">${seeds.map(cell).join("")}</div>
     <div class="mod-f"><span>Lo que te queda por comprar hoy</span><span></span></div>`;
+}
+
+// Texto del boost de un objeto (G.buffs puede traer varias líneas)
+const buffLine = (n) => { const b = G.buffs?.[n]; return Array.isArray(b) ? b.join(" · ") : b || ""; };
+/* ── Proyectos del pueblo (socialFarming.villageProjects): ánimos que llevan, los que piden y lo que dan ── */
+// Colocados de verdad (con coordenadas) en la granja, la casa o el interior: los quitados siguen en la lista sin coordenadas
+function placedWith(farm, name) {
+  const groups = [farm.collectibles, farm.home?.collectibles, ...Object.values(farm.interior || {}).map((lvl) => lvl?.collectibles)];
+  return groups.flatMap((g) => (g?.[name] || []).filter((it) => it?.coordinates));
+}
+function projectsModel() {
+  const farm = store.farm.data.farm, vp = farm.socialFarming?.villageProjects || {};
+  const req = G.projects?.cheers || {}, rew = G.projects?.rewards || {};
+  const price = has("activity") ? priceBook() : null;
+  return Object.entries(vp).filter(([n]) => req[n]).map(([name, p]) => {
+    const cheers = toNum(p.cheers), need = req[name], done = cheers >= need;
+    const reward = rew[name] || null, placed = placedWith(farm, name).length > 0;
+    const value = reward && price ? price(reward.item).v : null;
+    return { name, cheers, need, done, pct: Math.min(1, cheers / need), reward, value: value != null ? value * reward.amount : null, placed, helped: Boolean(p.helpedAt) };
+  }).sort((a, b) => Number(b.done) - Number(a.done) || b.pct - a.pct);
+}
+function wProjects() {
+  const list = projectsModel();
+  setSub("ov-projects", list.length ? `${list.filter((p) => p.done).length} de ${list.length} completados` : "");
+  if (!list.length) return Empty("hammer", "Sin proyectos", "Los proyectos del pueblo (monumentos, frutas gigantes, ollas) se construyen con los ánimos de tus amigos.");
+  return `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Proyecto</th><th>Ánimos</th><th>Da</th><th class="r">Estado</th></tr></thead><tbody>
+    ${list.map((p) => `<tr><td class="w">${Gi(p.name, 18)} ${esc(p.name)}</td>
+      <td style="min-width:120px"><div class="pbar"><i style="width:${(p.pct * 100).toFixed(0)}%;--c:${p.done ? "var(--green)" : "var(--sun)"}"></i></div><div class="ctx">${fmt(p.cheers, 0)} / ${fmt(p.need, 0)}${p.done ? "" : ` · faltan ${fmt(p.need - p.cheers, 0)}`}</div></td>
+      <td class="ctx">${p.reward ? `${Gi(p.reward.item, 14)} ${p.reward.amount}× ${esc(p.reward.item)}${p.value != null ? ` <span class="faint">≈ ${fmt(p.value, 2)} FLW</span>` : ""}` : esc(buffLine(p.name) || "su boost")}</td>
+      <td class="r">${p.done ? (p.reward ? `<span class="st-tag avail">¡Listo! recógelo</span>` : `<span class="tag green">activo</span>`) : `<span class="ctx">${fmt(p.pct * 100, 0)}%</span>`}</td></tr>`).join("")}
+  </tbody></table></div>
+  <div class="mod-f"><span>Los ánimos te los dan los jugadores que visitan tu granja · al completarse, las frutas gigantes y las ollas se recogen y los monumentos activan su boost</span><span>monuments.ts</span></div>`;
+}
+
+/* ── Santuarios y temporales: cuándo caducan los que tienes colocados, relojes de arena y tótems activos, Maneki Neko ── */
+// Duración de cada santuario (collectibleBuilt.ts → EXPIRY_COOLDOWNS): 7 días, salvo Legendary 1, Obsidian 14 y Trading 30
+const SHRINE_DAYS = { "Legendary Shrine": 1, "Obsidian Shrine": 14, "Trading Shrine": 30 };
+function tempsModel() { return tempsModelFor(store.farm.data.farm); }
+function tempsModelFor(farm) {
+  const t = now();
+  const names = placedCollectibles(farm).filter((n) => / Shrine$/.test(n));
+  const shrines = names.flatMap((n) => placedWith(farm, n).map((it) => {
+    const end = toNum(it.createdAt) + (SHRINE_DAYS[n] ?? 7) * DAY_MS;
+    return { name: n, end, left: end - t, expired: end <= t, buff: buffLine(n) };
+  })).sort((a, b) => a.end - b.end);
+  // Relojes de arena, tótems y otros temporales con su ventana activa ahora (boostHistory / buffs)
+  const seen = new Set(shrines.map((s) => s.name));
+  const active = tempWindows(farm).filter((w) => w.from <= t && w.to > t && !seen.has(w.name))
+    .reduce((acc, w) => { const o = acc.find((x) => x.name === w.name); if (o) o.to = Math.max(o.to, w.to); else acc.push({ ...w }); return acc; }, [])
+    .sort((a, b) => a.to - b.to);
+  const maneki = placedWith(farm, "Maneki Neko").map((it) => ({ shaken: it.shakenAt ? new Date(toNum(it.shakenAt)).toISOString().slice(0, 10) === todayUTC() : false }));
+  return { shrines, active, maneki };
+}
+function wTemps() {
+  const m = tempsModel(), t = now();
+  const exp = m.shrines.filter((s) => s.expired).length;
+  setSub("ov-temps", `${m.shrines.length} santuario${m.shrines.length === 1 ? "" : "s"}${exp ? ` · <span class="down">${exp} caducado${exp > 1 ? "s" : ""}</span>` : ""}${m.active.length ? ` · ${m.active.length} ${m.active.length > 1 ? "temporales activos" : "temporal activo"}` : ""}`);
+  const rows = [
+    ...m.shrines.map((s) => `<div class="qrow">${Gi(s.name, 16)}<span class="nm">${esc(s.name)}<em class="faint" title="${esc(s.buff)}">${esc(s.buff)}</em></span>
+      <span class="at">${s.expired ? `<span class="tag red">caducado</span>` : `quedan <b>${dur(s.left)}</b>`}</span></div>`),
+    ...m.active.map((w) => `<div class="qrow">${Gi(w.name, 16, "bolt")}<span class="nm">${esc(w.name)}<em class="faint">activo</em></span><span class="at">acaba en <b data-until="${w.to}">${dur(w.to - t)}</b></span></div>`),
+    ...m.maneki.map((k) => `<div class="qrow">${Gi("Maneki Neko", 16)}<span class="nm">Maneki Neko<em class="faint">una comida gratis al día</em></span><span class="at">${k.shaken ? `mañana · ${dur(nextUtcMidnight(t) - t)}` : `<span class="st-tag avail">agítalo hoy</span>`}</span></div>`),
+  ];
+  if (!rows.length) return Empty("bolt", "Nada temporal", "Aquí salen tus santuarios con lo que les queda, los relojes de arena y tótems activos y el Maneki Neko.");
+  return `<div class="qlist">${rows.join("")}</div><div class="mod-f"><span>Santuarios: 7 días (Legendary 1, Obsidian 14, Trading 30) desde que se colocan o renuevan</span><span>collectibleBuilt.ts</span></div>`;
 }

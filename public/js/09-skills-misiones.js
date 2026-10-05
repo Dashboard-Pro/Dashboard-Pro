@@ -21,6 +21,9 @@ const ISLAND_ES = { basic: "básica", spring: "primavera", desert: "desierto", v
 
 // Reglas del juego (choseSkill.ts): 1 punto por nivel; el tier 2/3 de un árbol se
 // desbloquea al gastar N puntos en él (sin contar los de tier 3).
+// Rangos (bumpkinSkills.ts): subir una skill tuya de rango cuesta tantos Ascension Shards como su tier y 1/3/6 puntos
+// (tier 1/2/3; esos puntos no cuentan para desbloquear tiers) y pide el tier min(3, tier + rango actual) en su árbol.
+const skillUpCost = (tier) => ({ shards: tier, points: G.skillUpgradePoints?.[tier] ?? [1, 3, 6][tier - 1] });
 function skillModel() {
   const f = store.farm.data;
   if (skillModel.c?.f === f) return skillModel.c.m;
@@ -31,14 +34,17 @@ function skillModel() {
   const islandIdx = G.islandOrder.indexOf(island);
   let used = 0;
   const trees = {};
+  const shards = toNum(f.farm.inventory?.["Ascension Shard"]);
   for (const [name, sk] of Object.entries(G.skills)) {
     const t = (trees[sk.tree] ||= { name: sk.tree, used: 0, tierPts: 0, owned: 0, total: 0, skills: [] });
     t.total++;
     t.skills.push({ name, ...sk });
     if (owned[name]) {
+      const rank = Math.min(sk.maxLevel || 1, Math.max(1, Math.round(toNum(owned[name]))));
+      const upPts = (rank - 1) * skillUpCost(sk.tier).points;
       t.owned++;
-      t.used += sk.points;
-      used += sk.points;
+      t.used += sk.points + upPts;
+      used += sk.points + upPts;
       if (sk.tier !== 3) t.tierPts += sk.points;
     }
   }
@@ -60,6 +66,17 @@ function skillModel() {
         : s.points > free ? `cuesta ${s.points} pts (tienes ${free})`
         : null;
       s.available = !s.owned && !s.reason;
+      s.maxRank = s.maxLevel || 1;
+      s.rank = s.owned ? Math.min(s.maxRank, Math.max(1, Math.round(toNum(owned[s.name])))) : 0;
+      if (s.owned && s.rank < s.maxRank && !s.disabled) {
+        const c = skillUpCost(s.tier), need = Math.min(3, s.tier + s.rank);
+        s.up = { rank: s.rank + 1, ...c, needTier: need };
+        s.upReason = t.tier < need ? `rango ${s.rank + 1}: pide tier ${need} en el árbol (faltan ${req[need] - t.tierPts} pts)`
+          : c.points > free ? `rango ${s.rank + 1}: cuesta ${c.points} pt${c.points > 1 ? "s" : ""} de skill (tienes ${free})`
+          : c.shards > shards ? `rango ${s.rank + 1}: cuesta ${c.shards} Ascension Shard${c.shards > 1 ? "s" : ""} (tienes ${shards})`
+          : null;
+        s.canUp = !s.upReason;
+      }
       if (s.power) {
         const cd = (s.cooldown || 0) * (luna ? 0.5 : 1);
         s.readyAt = (lastUse[s.name] || 0) + cd;
@@ -67,7 +84,7 @@ function skillModel() {
     }
     t.skills.sort((a, b) => a.tier - b.tier || a.points - b.points || a.name.localeCompare(b.name));
   }
-  const m = { level, used, free, island, trees, owned, luna, ownedCount: Object.keys(owned).filter((n) => G.skills[n]).length };
+  const m = { level, used, free, island, trees, owned, luna, shards, ownedCount: Object.keys(owned).filter((n) => G.skills[n]).length };
   skillModel.c = { f, m };
   return m;
 }
@@ -83,6 +100,7 @@ function wSkillKpis() {
     ${Kcell("Puntos libres", `${m.free}`, `${m.used} de ${m.level} gastados · 1 por nivel`, m.free > 0 ? "green" : "")}
     ${Kcell("Skills aprendidas", `${m.ownedCount}<small>/ ${all.length}</small>`, `${avail} disponibles para aprender ahora`)}
     ${Kcell("Poderes listos", `${ready}<small>/ ${powers.length}</small>`, m.luna ? "cooldowns a la mitad (Luna's Crescent)" : "habilidades activas con cooldown", ready ? "green" : "")}
+    ${Kcell("Ascension Shards", `${m.shards}`, (() => { const n = all.filter((s) => s.canUp).length; return n ? `${n} skill${n > 1 ? "s" : ""} para subir de rango ya` : all.some((s) => s.up) ? "suben skills de rango (también gastan puntos)" : "suben skills de rango"; })(), all.some((s) => s.canUp) ? "green" : "")}
     ${Kcell("Isla", ISLAND_ES[m.island] || m.island, "limita las skills disponibles")}
     ${top ? Kcell("Árbol principal", TREES[top.name]?.label || top.name, `${top.used} pts · tier ${top.tier}`) : ""}
   </div>`;
@@ -144,14 +162,60 @@ function wTreeDetail() {
           const tag = { owned: "✓ Aprendida", avail: "Disponible", blocked: "Bloqueada" }[st];
           return `<div class="skill ${st}" aria-label="${esc(`${s.name}: ${tag}`)}">
           <div class="sk-h"><span class="sk-st">${s.owned ? sprite("check", 12) : s.available ? `<i class="dot"></i>` : sprite("lock", 11)}</span>
-            <b>${esc(s.name)}</b>${s.power ? `<span class="tag">poder</span>` : ""}<span class="st-tag ${st}">${tag}</span><span class="sk-pts">${s.points} pt${s.points > 1 ? "s" : ""}</span></div>
+            <b>${esc(s.name)}</b>${s.power ? `<span class="tag">poder</span>` : ""}${s.owned && s.maxRank > 1 ? `<span class="tag sun" title="Rango ${s.rank} de ${s.maxRank}">R${s.rank}/${s.maxRank}</span>` : ""}<span class="st-tag ${st}">${tag}</span><span class="sk-pts">${s.points} pt${s.points > 1 ? "s" : ""}</span></div>
           <div class="sk-buff">${esc(s.buff)}</div>
           ${s.debuff ? `<div class="sk-debuff">${esc(s.debuff)}</div>` : ""}
           ${s.reason ? `<div class="sk-why">${sprite("lock", 8)}${esc(s.reason)}</div>` : s.available ? `<div class="sk-why ok">puedes aprenderla ya</div>` : ""}
+          ${s.up ? (s.canUp ? `<div class="sk-why ok">puedes subirla a rango ${s.up.rank}: ${s.up.shards} shard${s.up.shards > 1 ? "s" : ""} + ${s.up.points} pt${s.up.points > 1 ? "s" : ""}</div>` : `<div class="sk-why">${sprite("lock", 8)}${esc(s.upReason)}</div>`) : ""}
         </div>`;
         }).join("") || `<div class="ctx" style="padding:12px 16px">Nada con este filtro.</div>`}
       </div>`;
     }).join("")}</div>`;
+}
+
+// Subir de rango con Ascension Shards: todas tus skills mejorables, lo que cuesta, si puedes ya y lo que suma
+function skillUpgradeList() {
+  const m = skillModel(), gains = has("activity") ? skillUpGains() : {};
+  return Object.values(m.trees).flatMap((t) => t.skills.filter((s) => s.up).map((s) => ({ ...s, treeName: t.name, gain: gains[s.name] ?? null })))
+    .sort((a, b) => Number(b.canUp) - Number(a.canUp) || (b.gain ?? -1) - (a.gain ?? -1) || a.up.points - b.up.points || a.name.localeCompare(b.name));
+}
+function wSkillRanks() {
+  const m = skillModel(), list = skillUpgradeList(), now_ = list.filter((s) => s.canUp).length;
+  setSub("sk-ranks", `${m.shards} Ascension Shard${m.shards === 1 ? "" : "s"} · ${m.free} pt${m.free === 1 ? "" : "s"} libres · ${now_} para subir ya`);
+  if (!list.length) return Empty("bolt", "Nada que subir", "Cuando aprendas skills mejorables, aquí verás cuánto cuesta subirlas de rango.");
+  const head = !now_ ? `<div class="ctx" style="padding:10px 16px">${m.free <= 0 && m.shards > 0
+    ? `Tienes ${m.shards} Ascension Shard${m.shards === 1 ? "" : "s"}, pero subir de rango también gasta puntos de skill y no te queda ninguno libre: con cada nivel del Bumpkin ganas 1 (las de tier 1 piden 1 punto y 1 shard). Abajo, en qué gastarlos primero.`
+    : !m.shards ? "Te faltan Ascension Shards: se sacan picando el Ascension Crystal." : "Te faltan puntos de skill o el tier del árbol para las que quedan."}</div>` : "";
+  return `${head}<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Skill</th><th>Árbol</th><th class="r">Rango</th><th class="r">Coste</th>
+    <th class="r" data-tip="Ganancia|FLOWER al día que suma subirla un rango, sobre lo que produces hoy (mismo cálculo que el Simulador). Solo para skills con efecto en Producción|" tabindex="0">FLOWER/día</th><th>Estado</th></tr></thead><tbody>
+    ${list.map((s) => `<tr><td><b>${esc(s.name)}</b><div class="ctx" title="${esc(s.buff)}">${esc(s.buff)}</div></td>
+      <td>${esc(TREES[s.treeName]?.label || s.treeName)} <span class="dim">· T${s.tier}</span></td>
+      <td class="r mono">${s.rank} → ${s.up.rank}<div class="ctx">de ${s.maxRank}</div></td>
+      <td class="r mono">${Gi("Ascension Shard", 14)} ${s.up.shards} · ${s.up.points} pt${s.up.points > 1 ? "s" : ""}</td>
+      <td class="r mono ${s.gain == null ? "" : tone(s.gain)}">${s.gain == null ? `<span class="dim">—</span>` : signed(s.gain, 3)}</td>
+      <td>${s.canUp ? `<span class="st-tag avail">Puedes subirla ya</span>` : `<span class="ctx">${esc(s.upReason)}</span>`}</td></tr>`).join("")}
+  </tbody></table></div>
+  <div class="mod-f"><span>Coste por rango: tantos shards como su tier y 1/3/6 puntos de skill (tier 1/2/3) · el rango 2 de una de tier 1 pide tier 2 en el árbol y el 3, tier 3</span><span>bumpkinSkills.ts del juego</span></div>`;
+}
+
+// Shards y reinicio: cristales por picar (3 shards cada uno con un Gold Pickaxe, mineAscensionCrystal.ts) y cuándo puedes
+// reiniciar las skills (gratis cada 180 días; con gemas 200 · 2^reinicios pagados, resetSkills.ts). Reiniciar devuelve
+// todos los puntos y los shards gastados.
+function wSkillShards() {
+  const farm = store.farm.data.farm, m = skillModel(), t = now();
+  const crystals = Object.values(farm.ascensionCrystals || {}).filter((c) => c && c.x != null).length;
+  const pickaxes = haveOf("Gold Pickaxe");
+  const spent = Object.values(m.trees).flatMap((tr) => tr.skills).filter((s) => s.owned && s.rank > 1).reduce((a, s) => a + (s.rank - 1) * s.tier, 0);
+  const freeAt = toNum(farm.bumpkin?.previousFreeSkillResetAt) + 180 * DAY_MS;
+  const gems = 200 * Math.pow(2, toNum(farm.bumpkin?.paidSkillResets));
+  return `<div class="kv-list">
+      <div><span>Ascension Shards</span><b>${fmt(m.shards, 0)}</b></div>
+      <div><span>Gastados en rangos</span><b>${fmt(spent, 0)}</b></div>
+      <div><span>Cristales por picar</span><b>${crystals}</b>${crystals ? `<em>= ${crystals * 3} shards · gastan ${crystals} Gold Pickaxe (tienes ${fmt(pickaxes, 0)})</em>` : ""}</div>
+      <div><span>Reinicio gratis</span><b>${freeAt <= t ? `<span class="up">disponible</span>` : `en ${dur(freeAt - t)}`}</b><em>cada 180 días</em></div>
+      <div><span>Reinicio con gemas</span><b>${fmt(gems, 0)} gemas</b><em>se dobla con cada reinicio pagado</em></div>
+    </div>
+    <div class="mod-f"><span>Cada Ascension Crystal da 3 shards (se gasta al picarlo): sale uno al subir a primavera, desierto y volcán (9 shards antes de ascender) y más al ascender · reiniciar devuelve todos los puntos y shards</span><span>mineAscensionCrystal.ts · resetSkills.ts</span></div>`;
 }
 
 /* ── Valoración de items (mercado → receta → coins) ─────────────────────── */
@@ -197,6 +261,29 @@ function priceBook() {
           sum += p.v * q;
         }
         if (ok) { v = sum; src = "receta"; }
+      }
+      if (v == null && depth < 4) {
+        // Lo que no se vende ni tiene receta de taller: lo que cuesta hacerlo en el aging shed (especiero, fermentación),
+        // procesarlo en el Fish Market (receta de la estación) o atraparlo (la trampa + engodo más barata)
+        const U = G.utilities || {};
+        const sum = (items) => { let s = 0; for (const [k, q] of Object.entries(items || {})) { const p = fn(k, depth + 1); if (p.v == null) return null; s += p.v * q; } return s; };
+        const made = Object.values({ ...(U.spice || {}), ...(U.fermentation || {}) }).find((r) => r.secs > 0 && r.out?.[name]);
+        if (made) { const s = sum(made.items); if (s != null) { v = s / made.out[name]; src = "receta"; } }
+        else if (U.processing?.secs?.[name]) {
+          const season = store.farm?.data?.farm?.season?.season || "summer";
+          const s = sum({ ...(U.processing.base[name] || {}), ...(U.processing.seasonal[name]?.[season] || {}) });
+          if (s != null) { v = s; src = "receta"; }
+        } else if (U.crustaceans) {
+          let best = null;
+          for (const [trap, map] of Object.entries(U.crustaceans.lookup)) for (const [chum, what] of Object.entries(map)) {
+            if (what !== name) continue;
+            const t = fn(trap, depth + 1).v, c = chum === "none" ? 0 : fn(chum, depth + 1).v;
+            if (t == null || c == null) continue;
+            const cost = t + c * (chum === "none" ? 0 : U.crustaceans.chums[trap]?.[chum] || 0);
+            if (best == null || cost < best) best = cost;
+          }
+          if (best != null) { v = best; src = "receta"; }
+        }
       }
     }
     return (cache[name] = { v, src });
@@ -271,7 +358,8 @@ const isDoubleToday = () => calendarEvents().some((d) => d.date === todayUTC() &
 // (interior.ground y demás plantas). El juego los cuenta todos como "construidos" para sus boosts.
 function placedCollectibles(farm) {
   const groups = [farm.collectibles, farm.home?.collectibles, ...Object.values(farm.interior || {}).map((lvl) => lvl?.collectibles)];
-  return [...new Set(groups.flatMap((g) => Object.entries(g || {}).filter(([, v]) => (v || []).length).map(([k]) => k)))];
+  // Solo lo que está en el mapa: lo quitado sigue en la lista pero sin coordenadas (y con removedAt)
+  return [...new Set(groups.flatMap((g) => Object.entries(g || {}).filter(([, v]) => (v || []).some((it) => it && (it.coordinates || !("removedAt" in it)))).map(([k]) => k)))];
 }
 const isPlaced = (farm, name) => placedCollectibles(farm).includes(name);
 
@@ -374,11 +462,13 @@ function missionTabs() {
   return `<div class="seg tabs">${Object.entries(MISSION_TABS).map(([k, t]) => `<button role="tab" aria-selected="${k === tab}" data-mstab="${k}" class="${k === tab ? "on" : ""}">
     ${t.label}${counts[k] != null ? ` <span class="cnt">${counts[k]}</span>` : ""}</button>`).join("")}</div>`;
 }
+ACTIONS.gempack = (v) => { S.gemPack = v; writeLS("gemPack", v); renderHeader?.(); repaint("farm"); toast(v ? `Gemas valoradas con el paquete de ${v}` : "Gemas valoradas con el paquete más barato"); };
 function missionSettings() {
   const auto = autoTicketBoost();
   return `<div class="toolbar">
     <span class="ctx">Coins por FLOWER</span><input class="inp" id="coinRateInput" type="text" inputmode="decimal" style="width:80px" value="${esc(S.coinRate ?? "")}" placeholder="auto ${fmt(marketCoinRate() || G.coinsPerFlower, 0)}" title="Vacío = automático: la mejor conversión del Conversor de monedas (${fmt(marketCoinRate() || G.coinsPerFlower, 0)} coins/FLOWER con tus boosts de venta). Escribe un número para fijarlo a mano. El banco da ${G.coinsPerFlower}." />${S.coinRate != null ? `<button class="btn ghost sm" data-act="coinauto" title="Volver al valor automático (${fmt(marketCoinRate() || G.coinsPerFlower, 0)})">auto</button>` : `<span class="tag green" title="Se actualiza solo con los precios del mercado">auto</span>`}
     <span class="ctx" title="${esc(currentChapter() ? `${currentChapter()}: ${(G.chapterBoosts[currentChapter()] || []).join(", ")} (+1 cada uno equipado por ti o un ayudante)` : "Capítulo no reconocido: actualiza con npm run gamedata")}">Boost capítulo</span>${Seg([["auto", auto != null ? `auto (${auto})` : "auto"], [0, "0"], [1, "+1"], [2, "+2"], [3, "+3"]], S.ticketBoost == null ? "auto" : S.ticketBoost, "tboost")}
+    ${(() => { const packs = Object.values(store.fx?.data?.gems || {}).filter((p) => p.gem > 0 && p.sfl > 0).sort((x, y) => x.gem - y.gem); return packs.length ? `<span class="ctx" title="Con qué paquete de la tienda se valoran las gemas (expansiones, subastas, coste de lo que piden gemas)">Gemas</span><select class="inp" data-chg="gempack" style="width:auto"><option value="" ${!S.gemPack ? "selected" : ""}>el paquete más barato</option>${packs.map((p) => `<option value="${p.gem}" ${String(S.gemPack) === String(p.gem) ? "selected" : ""}>${fmt(p.gem, 0)} gemas · ${fmt(p.sfl / p.gem, 4)} FLW/gema · ${fmt(p.usd, 2)} USD</option>`).join("")}</select>` : ""; })()}
     <label class="toggle"><input type="checkbox" id="taxToggle" ${S.p2pTax ? "checked" : ""} /><i></i>Descontar la comisión</label>
     <span class="grow"></span>
     <label class="toggle"><input type="checkbox" id="doneToggle" ${S.showDone ? "checked" : ""} /><i></i>Ver completadas</label>

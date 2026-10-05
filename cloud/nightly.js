@@ -42,6 +42,8 @@ const METRICS = {
   iron: "Hierro", gold: "Oro", crimstones: "Crimstone", oil: "Oil", fruitPatches: "Frutales",
   flowerBeds: "Macizos", beehives: "Colmenas", nfts: "NFTs",
 };
+// Orden de las islas para la carrera de expansiones (las de ascensión van después de las normales)
+const ISLE_RANK = { basic: 0, spring: 1, desert: 2, volcano: 3, swamp: 4, spooky: 5, crystal: 6, galaxy: 7, marble: 8 };
 function metricsOf(f, ctx) {
   const inv = f.inventory || {}, wr = f.wardrobe || {};
   let worth = num(f.balance), nfts = 0;
@@ -153,6 +155,9 @@ function createNightly({ dataDir, publicDir, fetchData, getConfig, log = () => {
       const items = {}, wearables = {};
       const islands = {}, factions = {};
       let farms = 0, skipped = 0, vip = 0, active1 = 0, active7 = 0, mine = null;
+      // Carrera de expansiones: isla (por orden, ascendidas después) y parcelas; se guardan las 100 primeras y tu puesto
+      const raceScores = [], race = [];
+      const streaks = { active: 0, 7: 0, 14: 0, 30: 0, 60: 0, 100: 0 }, ascension = {};
 
       state.phase = "descargando";
       // Sin cabeceras: el CDN es público y la key nunca sale de la API oficial
@@ -178,6 +183,19 @@ function createNightly({ dataDir, publicDir, fetchData, getConfig, log = () => {
         const la = num(o.lastActivity);
         if (now - la < 86400_000) active1++;
         if (now - la < 7 * 86400_000) active7++;
+
+        const asc = num(f.island?.ascensionLevel), score = (ISLE_RANK[isl] ?? 0) * 1000 + num(f.inventory?.["Basic Land"]);
+        raceScores.push(score);
+        if (race.length < 100 || score > race[race.length - 1].score) {
+          const bc = f.expansionConstruction;
+          race.push({ score, id: o.id, nftId: o.nftId, username: f.username || null, island: isl, asc, lands: num(f.inventory?.["Basic Land"]),
+            build: bc?.readyAt ? { from: num(bc.createdAt), to: num(bc.readyAt) } : null, equipped: f.bumpkin?.equipped || null });
+          race.sort((a, b) => b.score - a.score || (a.build?.to ?? Infinity) - (b.build?.to ?? Infinity));
+          if (race.length > 100) race.pop();
+        }
+        if (asc) ascension[asc] = (ascension[asc] || 0) + 1;
+        const st = num(f.desert?.digging?.streak?.count);
+        if (st > 0) { streaks.active++; for (const b of [7, 14, 30, 60, 100]) if (st >= b) streaks[b]++; }
 
         // Suministro: unidades totales y cuántas granjas tienen cada item
         const owned = new Set();
@@ -228,7 +246,9 @@ function createNightly({ dataDir, publicDir, fetchData, getConfig, log = () => {
           p90: Object.fromEntries(Object.entries(g.vals).map(([m, a]) => [m, quantiles(a)[Q * 0.9] ?? 0])),
           boosts: Object.fromEntries(Object.entries(g.boosts).filter(([, c]) => c / g.n >= MIN_SHARE).sort((a, b) => b[1] - a[1]).slice(0, 80)),
         }])),
-        items, wearables,
+        items, wearables, streaks, ascension,
+        race: race.map(({ score, ...r }) => r),
+        raceMine: mine ? (() => { const sc = (ISLE_RANK[mine.island] ?? 0) * 1000 + mine.metrics.expansions; return { rank: raceScores.filter((x) => x > sc).length + 1, score: sc }; })() : null,
         me: mine && ranked(mine),
         friends: Object.fromEntries(Object.entries(friends).map(([k, row]) => [k, ranked(row)])),
       };

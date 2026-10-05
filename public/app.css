@@ -1061,8 +1061,25 @@ a.sr { color: inherit; text-decoration: none; }
 .gb-rank button.on { color: var(--bg); background: var(--green); border-color: var(--green); }
 
 /* Crafteo: rejilla 3×3 de la Crafting Box */
-.cb-grid { display: grid; grid-template-columns: repeat(3, 22px); gap: 2px; }
-.cb-grid span { width: 22px; height: 22px; display: grid; place-items: center; border: 1px solid var(--line-2); background: color-mix(in srgb, var(--line) 40%, transparent); }
+.cb-grid { display: grid; grid-template-columns: repeat(3, 40px); gap: 3px; flex: none; }
+.cb-grid span { width: 40px; height: 40px; display: grid; place-items: center; border: 1px solid var(--line-2); background: color-mix(in srgb, var(--line) 40%, transparent); image-rendering: pixelated; }
+.cb-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 12px; padding: 12px 16px 16px; }
+.cb-card { border: 1px solid var(--line); background: var(--bg-2); display: flex; flex-direction: column; min-width: 0; }
+.cb-card.can { border-color: color-mix(in srgb, var(--green) 55%, var(--line)); }
+.cb-head { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.cb-head b { font: 600 15px var(--sans); color: var(--text); margin-right: 6px; }
+.cb-head img { image-rendering: pixelated; }
+.cb-body { display: flex; gap: 14px; padding: 12px; align-items: flex-start; }
+.cb-ing { display: grid; gap: 6px; min-width: 0; flex: 1; }
+.cb-ing div { display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: center; font-size: 13px; }
+.cb-ing span { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cb-ing b { font: 600 14px var(--mono); }
+.cb-stats { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line); margin-top: auto; }
+.cb-stats div { padding: 8px 10px; border-right: 1px solid var(--line); display: flex; flex-direction: column; gap: 2px; }
+.cb-stats div:last-child { border-right: 0; }
+.cb-stats span { font: 600 9px var(--sans); letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); }
+.cb-stats b { font: 600 14px var(--mono); }
+@media (max-width: 760px) { .cb-cards { grid-template-columns: 1fr; padding: 10px; } .cb-grid { grid-template-columns: repeat(3, 34px); } .cb-grid span { width: 34px; height: 34px; } }
 
 /* Menú en dos bloques (Tu granja / Guías) con grupos plegables */
 .nav-sec { margin: 12px 10px 2px; padding: 4px 2px; font: 700 11px var(--pixel); letter-spacing: 0.08em; text-transform: uppercase; color: var(--sun); border-bottom: 1px solid var(--line-2); }
@@ -1120,3 +1137,97 @@ button.nav-h:hover { color: var(--text); }
 .tour-n { font: 600 10px var(--sans); letter-spacing: 0.1em; color: var(--faint); }
 .tour-btns { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 6px; }
 .tour-skip { margin-right: auto; background: none; border: 0; padding: 0; color: var(--muted); font: 12px var(--sans); cursor: pointer; text-decoration: underline; }
+
+/* ── Calculadora de expansiones (Guías → Expansiones) ── */
+.xstep { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; }
+.xstep .btn { min-width: 26px; padding: 2px 6px; }
+.xboosts { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--line); align-items: center; }
+.xboost { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: var(--bg-2); border: 1px solid var(--line); color: var(--muted); cursor: pointer; text-align: left; position: relative; opacity: 0.6; }
+.xboost span { display: flex; flex-direction: column; line-height: 1.25; }
+.xboost b { font: 600 12px var(--sans); color: var(--text); }
+.xboost small { font: 11px var(--mono); }
+.xboost.on { opacity: 1; border-color: var(--sun); background: var(--panel-2); }
+.xboost.on small { color: var(--green); }
+.xboost .dot { position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; background: var(--orange); }
+.xwrap { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; padding: 16px; border-bottom: 1px solid var(--line); }
+.xmapbox { min-width: 0; }
+.xmapscroll { overflow: auto; max-width: 100%; }
+.xmap { position: relative; margin: 0 auto; overflow: hidden; background: #3c7bc0; image-rendering: pixelated; }
+.xbg { position: absolute; transform: translate(-50%, -50%); max-width: none; image-rendering: pixelated; pointer-events: none; }
+.xland { position: absolute; width: 96px; height: 96px; padding: 4px; border: 1px dashed rgba(255,255,255,.18); background: transparent; color: #fff; text-shadow: 0 1px 0 #000, 0 0 3px #000; font: inherit; text-align: left; display: flex; flex-direction: column; overflow: hidden; }
+button.xland { cursor: pointer; }
+button.xland:hover { border-color: var(--sun); }
+.xland b { font: 700 13px var(--mono); }
+.xland.own { background: rgba(0,0,0,.08); }
+.xland.sel { background: rgba(245,197,66,.28); border: 1px solid var(--sun); }
+.xland.next { background: rgba(10,20,40,.45); }
+.xland.hl { box-shadow: inset 0 0 0 3px var(--blue); }
+.xland.tgt { border: 2px solid var(--red); }
+.xland.st { border: 2px solid var(--green); }
+.xflag { position: absolute; top: 3px; right: 3px; font: 700 10px var(--mono); font-style: normal; padding: 1px 4px; color: #fff; background: var(--green-ink); }
+.xflag.t { background: var(--red); }
+.xchips { margin-top: auto; display: flex; flex-wrap: wrap; gap: 2px 5px; font: 600 10px var(--mono); }
+.xchips span { background: rgba(0,0,0,.45); padding: 0 2px; }
+.xchips span { display: inline-flex; align-items: center; gap: 1px; }
+.xleg { display: flex; gap: 6px; align-items: center; justify-content: center; margin-top: 10px; font-size: 11px; color: var(--muted); flex-wrap: wrap; }
+.xleg .xland { position: static; width: 12px; height: 12px; padding: 0; display: inline-block; margin-left: 8px; border: 1px solid var(--line); }
+.xleg .xland.own { background: #5b9b3a; } .xleg .xland.next { background: #2b3a55; }
+.xside .grp { margin: 0 0 8px; padding: 6px 0; background: none; border: 0; }
+.xadded { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.xadded div { display: grid; grid-template-columns: auto 1fr; column-gap: 8px; align-items: center; padding: 6px 8px; background: var(--bg-2); border: 1px solid var(--line); }
+.xadded img, .xadded .spr { grid-row: span 3; }
+.xadded b { font: 600 15px var(--mono); color: var(--green); }
+.xadded span { font-size: 11px; color: var(--text); }
+.xadded small { font: 10px var(--mono); color: var(--faint); }
+.xfilt { display: flex; flex-wrap: wrap; gap: 4px; }
+.xfilt button { display: inline-flex; align-items: center; gap: 4px; padding: 3px 7px; font-size: 11px; background: var(--bg-2); border: 1px solid var(--line); color: var(--muted); cursor: pointer; }
+.xfilt button.on { border-color: var(--blue); color: var(--text); }
+@media (max-width: 1080px) { .xwrap { grid-template-columns: 1fr; } }
+@media (max-width: 760px) { .xchips { display: none; } .xwrap { padding: 10px; } }
+
+/* ── Estadísticas del juego ── */
+.st-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0; border-bottom: 1px solid var(--line); }
+.st-card { border-right: 1px solid var(--line); min-width: 0; }
+.st-card .grp { border-top: 0; }
+.stat-bars { padding: 10px 16px; display: grid; gap: 8px; }
+.sb-row { display: grid; grid-template-columns: 120px 1fr auto; gap: 10px; align-items: center; font-size: 12px; }
+.sb-l { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sb-v { font-size: 12px; text-align: right; min-width: 110px; }
+@media (max-width: 760px) { .sb-row { grid-template-columns: 90px 1fr auto; } .sb-v { min-width: 80px; } }
+
+/* ── Lista clave-valor (Skills → Shards y reinicio) ── */
+.kv-list { display: grid; gap: 0; }
+.kv-list > div { display: grid; grid-template-columns: 1fr auto; column-gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); align-items: baseline; }
+.kv-list > div:last-child { border-bottom: 0; }
+.kv-list span { color: var(--muted); font-size: 12px; }
+.kv-list b { font: 600 14px var(--mono); text-align: right; }
+.kv-list em { grid-column: 1 / -1; font-style: normal; font-size: 11px; color: var(--faint); }
+.cb-side { display: grid; gap: 4px; flex: none; min-width: 120px; border-left: 1px solid var(--line); padding-left: 12px; }
+.cb-side div { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; color: var(--faint); }
+.cb-side div.on { color: var(--text); }
+.cb-side b { font: 600 12px var(--mono); }
+.cb-head .ctx { white-space: normal; margin-top: 2px; }
+
+/* ── Simulador de distribución ── */
+.ly-wrap { display: grid; grid-template-columns: minmax(0, 1fr) 300px; border-bottom: 1px solid var(--line); }
+.ly-scroll { overflow: auto; max-height: 78vh; background: #3c7bc0; }
+.ly-map { position: relative; margin: 0 auto; image-rendering: pixelated; touch-action: none; }
+.ly-bg { position: absolute; max-width: none; pointer-events: none; image-rendering: pixelated; transform-origin: center; }
+.ly-i { position: absolute; display: grid; place-items: center; cursor: grab; border: 1px solid rgba(0,0,0,.25); background: rgba(255,255,255,.06); user-select: none; }
+.ly-i img { pointer-events: none; image-rendering: pixelated; }
+.ly-i.deco { z-index: 2; } .ly-i.build { z-index: 1; }
+.ly-i.drag { cursor: grabbing; z-index: 5; opacity: .85; box-shadow: 0 6px 18px rgba(0,0,0,.45); }
+.ly-i.sel { outline: 2px solid var(--sun); outline-offset: 1px; z-index: 4; }
+.ly-i.bad { background: rgba(224,82,107,.45); border-color: var(--red); }
+.ly-i.out { background: rgba(240,162,74,.45); border-color: var(--orange); }
+.ly-aoe { position: absolute; background: rgba(108,180,238,.18); border: 1px dashed rgba(108,180,238,.8); pointer-events: none; z-index: 0; }
+.ly-side { border-left: 1px solid var(--line); padding: 0 12px 12px; min-width: 0; overflow: auto; max-height: 78vh; }
+.ly-side .grp { margin: 0 -12px 8px; }
+.ly-sel { display: flex; gap: 10px; align-items: flex-start; }
+.ly-sel b { font: 600 14px var(--sans); }
+.ly-btns { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.ly-pal { display: grid; gap: 4px; }
+.ly-pal button { display: grid; grid-template-columns: 28px 1fr auto; gap: 8px; align-items: center; padding: 4px 6px; background: var(--bg-2); border: 1px solid var(--line); color: var(--text); cursor: pointer; text-align: left; font-size: 12px; }
+.ly-pal button:hover { border-color: var(--sun); }
+.ly-pal em { font-style: normal; font: 600 12px var(--mono); color: var(--muted); }
+@media (max-width: 1080px) { .ly-wrap { grid-template-columns: 1fr; } .ly-side { border-left: 0; border-top: 1px solid var(--line); max-height: none; } }

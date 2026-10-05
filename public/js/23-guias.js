@@ -133,23 +133,32 @@ function cookRow(name, f, v) {
   return { name, building: b, parts, secs: s, baseSecs: f.seconds, xp, baseXp: f.xp, portions, cost: ok ? cost : null, perPlate,
     xpPerFlower: perPlate ? xp / perPlate : null, xpDay: s > 0 ? (86400 / s) * portions * xp : null, have: gFarm() ? haveOf(name) : 0 };
 }
+S.gcView = readLS("gcView", "cards");
 function wGuideCooking() {
   const bx = gBoosts("cooking", cookDefs());
-  const all = Object.entries(G.foods || {}).map(([n, f]) => cookRow(n, f, bx.val));
+  const all = Object.entries(G.foods || {}).map(([n, f]) => { const r = cookRow(n, f, bx.val); return { ...r, can: canMake(Object.fromEntries(r.parts.map((p) => [p.n, p.q]))) }; });
   const buildings = [...new Set(all.map((r) => r.building).filter(Boolean))];
-  const list = all.filter((r) => !S.gcBuilding || r.building === S.gcBuilding).sort((a, b) => (b.xpPerFlower ?? -1) - (a.xpPerFlower ?? -1) || b.xp - a.xp);
+  const list = all.filter((r) => !S.gcBuilding || r.building === S.gcBuilding).sort((a, b) => canFirst(a, b) || (b.xpPerFlower ?? -1) - (a.xpPerFlower ?? -1) || b.xp - a.xp);
   const counts = Object.fromEntries(buildings.map((b) => [b, all.filter((r) => r.building === b).length]));
-  const seg = `<div class="seg ref-seg"><button data-act="gcb:" class="${!S.gcBuilding ? "on" : ""}">Todos ${all.length}</button>${buildings.map((b) => `<button data-act="gcb:${esc(b)}" class="${S.gcBuilding === b ? "on" : ""}">${esc(b)} ${counts[b]}</button>`).join("")}</div>`;
-  return `${bx.panel}${seg}<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Receta</th><th>Ingredientes</th><th class="r">Tiempo</th><th class="r">Raciones</th><th class="r">XP</th><th class="r">Coste</th><th class="r">Por plato</th><th class="r">XP/FLOWER</th><th class="r">XP al día</th></tr></thead><tbody>
-    ${list.map((r) => `<tr data-tip="${esc(`${r.name}|${r.building || ""} · base ${r.baseSecs ? dur(r.baseSecs * 1000) : "al instante"} y ${fmt(r.baseXp, 0)} XP${r.have ? ` · tienes ${fmt(r.have, 0)}` : ""}|`)}">
-      <td class="w">${Gi(r.name, 16)} ${esc(r.name)}</td><td class="ctx wrap">${r.parts.map((p) => `${Gi(p.n, 12)} ${fmt(p.q, 0)}`).join(" ")}</td>
+  const seg = `<div class="toolbar" style="padding:8px 12px;gap:8px;flex-wrap:wrap"><div class="seg ref-seg"><button data-act="gcb:" class="${!S.gcBuilding ? "on" : ""}">Todos ${all.length}</button>${buildings.map((b) => `<button data-act="gcb:${esc(b)}" class="${S.gcBuilding === b ? "on" : ""}">${esc(b)} ${counts[b]}</button>`).join("")}</div>
+    <span class="grow"></span>${gTabs("gcv", S.gcView, [["cards", "Tarjetas"], ["table", "Tabla"]])}</div>`;
+  const foot = `<div class="mod-f"><span>Primero lo que puedes cocinar ya · ingredientes a precio P2P (un plato usado como ingrediente, por su receta) · Wild/Magic Mushroom a 0 · XP al día = un edificio cocinando sin parar</span><span>Tótems, shrines y relojes cuentan como activos toda la cocción</span></div>`;
+  if (S.gcView === "cards") return `${bx.panel}${seg}<div class="cb-cards">${list.map((r) => ItemCard({ name: r.name, can: r.can,
+      tags: r.have ? `<span class="tag">tienes ${fmt(r.have, 0)}</span>` : "",
+      sub: `${esc(r.building || "")} · ${r.secs ? dur(r.secs * 1000) : "al instante"}${r.portions !== 1 ? ` · ${fmt(r.portions, r.portions % 1 ? 2 : 0)} raciones` : ""}`,
+      body: IngList(Object.fromEntries(r.parts.map((p) => [p.n, p.q]))),
+      stats: [["XP", fmt(r.xp, 0), r.xp > r.baseXp ? "up" : ""], ["Por plato", r.perPlate == null ? "—" : fmt(r.perPlate, 3)], ["XP/FLOWER", r.xpPerFlower == null ? "—" : compact(r.xpPerFlower)], ["Puedes", r.can == null ? "—" : `${r.can}×`, r.can ? "up" : "dim"]],
+    })).join("")}</div>${foot}`;
+  return `${bx.panel}${seg}<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Receta</th><th>Ingredientes</th><th class="r">Tiempo</th><th class="r">Raciones</th><th class="r">XP</th><th class="r">Coste</th><th class="r">Por plato</th><th class="r">XP/FLOWER</th><th class="r">XP al día</th><th class="r">Puedes</th></tr></thead><tbody>
+    ${list.map((r) => `<tr class="${r.can ? "" : "dim"}" data-tip="${esc(`${r.name}|${r.building || ""} · base ${r.baseSecs ? dur(r.baseSecs * 1000) : "al instante"} y ${fmt(r.baseXp, 0)} XP${r.have ? ` · tienes ${fmt(r.have, 0)}` : ""}|`)}">
+      <td class="w">${Gi(r.name, 22)} ${esc(r.name)}</td><td class="ctx wrap">${r.parts.map((p) => `${Gi(p.n, 16)} ${fmt(p.q, 0)}`).join(" ")}</td>
       <td class="r mono${r.secs < r.baseSecs ? " up" : ""}">${r.secs ? dur(r.secs * 1000) : "—"}</td><td class="r mono">${fmt(r.portions, r.portions % 1 ? 2 : 0)}</td>
       <td class="r mono${r.xp > r.baseXp ? " up" : ""}">${fmt(r.xp, 0)}</td><td class="r mono dim">${r.cost == null ? "—" : fmt(r.cost, 3)}</td>
       <td class="r mono">${r.perPlate == null ? "—" : fmt(r.perPlate, 3)}</td><td class="r mono"><b>${r.xpPerFlower == null ? "—" : compact(r.xpPerFlower)}</b></td>
-      <td class="r mono dim">${r.xpDay == null ? "—" : compact(r.xpDay)}</td></tr>`).join("")}
-  </tbody></table></div>
-  <div class="mod-f"><span>Ingredientes a precio P2P (un plato usado como ingrediente, por su receta) · Wild/Magic Mushroom a 0 · XP al día = un edificio cocinando sin parar</span><span>Tótems, shrines y relojes cuentan como activos toda la cocción</span></div>`;
+      <td class="r mono dim">${r.xpDay == null ? "—" : compact(r.xpDay)}</td><td class="r mono ${r.can ? "up" : ""}">${r.can == null ? "—" : `${r.can}×`}</td></tr>`).join("")}
+  </tbody></table></div>${foot}`;
 }
+ACTIONS.gcv = (v) => { S.gcView = v; writeLS("gcView", v); rerun(); };
 ACTIONS.gcb = (b) => { S.gcBuilding = b; writeLS("gcBuilding", b); rerun(); };
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -193,13 +202,21 @@ function marvelMapModel() {
 function wGuideMaps() {
   const list = marvelMapModel(), farm = gFarm();
   const src = (x) => `<span class="${x.active ? "" : "faint"}" style="margin-right:8px">${Gi(x.fish, 12)} ${esc(x.fish)} ${fmt(x.odds * 100, x.odds < 0.01 ? 2 : 1)}%</span>`;
-  return `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Maravilla marina</th><th>Capítulo</th><th>Suelta pieza</th><th class="r">Puzle</th><th class="r">Piezas</th><th class="r">Pescada</th><th>Trofeo</th></tr></thead><tbody>
-    ${list.map((m) => `<tr class="${m.active ? "" : "dim"}"><td class="w">${Gi(m.name, 18)} ${esc(m.name)}${m.active ? ` <span class="tag green">se puede conseguir</span>` : ""}</td>
+  // Capturas que hacen falta de media para las piezas que faltan, pescando el pez que más suelta (1 / probabilidad cada una)
+  const expect = (m) => {
+    const best = m.sources.filter((x) => x.active && x.odds > 0).sort((a, b) => b.odds - a.odds)[0];
+    const left = Math.max(0, MAP_PIECES_NEEDED - (farm ? m.found : 0));
+    return best && left ? { fish: best.fish, n: left / best.odds, one: 1 / best.odds } : null;
+  };
+  return `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Maravilla marina</th><th>Capítulo</th><th>Suelta pieza</th><th class="r">Puzle</th><th class="r">Piezas</th>
+      <th class="r" data-tip="Capturas de media|Las que necesitas del pez que más piezas suelta para juntar las que te faltan (cada pieza cae 1 de cada 1/probabilidad capturas de ese pez)|" tabindex="0">Te faltan de media</th><th class="r">Pescada</th><th>Trofeo</th></tr></thead><tbody>
+    ${list.map((m) => { const e = expect(m); return `<tr class="${m.active ? "" : "dim"}"><td class="w">${Gi(m.name, 18)} ${esc(m.name)}${m.active ? ` <span class="tag green">se puede conseguir</span>` : ""}</td>
       <td class="ctx">${m.chapter ? esc(m.chapter) + (m.chapter === currentChapter() ? " · en curso" : "") : "permanente"}</td>
       <td class="ctx wrap">${m.sources.map(src).join("")}</td><td class="r mono">${m.difficulty ?? "—"}</td>
       <td class="r mono ${m.found ? "" : "dim"}">${farm ? `${m.found}/${MAP_PIECES_NEEDED}` : "—"}</td>
+      <td class="r mono">${e ? `~${fmt(e.n, 0)}<div class="ctx">capturas de ${esc(e.fish)} · 1 pieza cada ~${fmt(e.one, 0)}</div>` : "—"}</td>
       <td class="r mono ${m.caught ? "up" : "dim"}">${farm ? (m.caught ? `✓ ${m.caught}` : "no") : "—"}</td>
-      <td class="ctx wrap">${esc(m.buff) || `<span class="faint">decorativo</span>`}</td></tr>`).join("")}
+      <td class="ctx wrap">${esc(m.buff) || `<span class="faint">decorativo</span>`}</td></tr>`; }).join("")}
   </tbody></table></div>
   <div class="mod-f"><span>Hay que juntar ${MAP_PIECES_NEEDED} piezas de su mapa y resolver el puzle (dificultad 1-5) para poder pescarlo · las del capítulo solo caen mientras dura</span><span>Piezas = las que has encontrado en total</span></div>`;
 }

@@ -181,7 +181,16 @@ function recommendations() {
   const sm = skillModel();
   const powers = Object.values(sm.trees).flatMap((tr) => tr.skills).filter((s) => s.power && s.owned && s.readyAt <= t);
   if (powers.length) add(1, "bolt", `${powers.length} poder${powers.length > 1 ? "es" : ""} listo${powers.length > 1 ? "s" : ""}`, powers.map((s) => s.name).join(", "), "skills");
-  if (sm.free > 0) add(2, "bolt", `${sm.free} punto${sm.free > 1 ? "s" : ""} de skill sin gastar`, "Hay skills disponibles para aprender", "skills");
+  // Rangos con Ascension Shards: lo que puedes subir ya o, si faltan puntos, cuál subir primero en cuanto los tengas
+  const ups = skillUpgradeList(), upNow = ups.filter((x) => x.canUp);
+  const upName = (x) => `${x.name} → rango ${x.up.rank}${x.gain > 0 ? ` (+${fmt(x.gain, 3)} FLOWER/día)` : ""}`;
+  if (upNow.length) add(2, "bolt", `Puedes subir de rango ${upNow.length} skill${upNow.length > 1 ? "s" : ""}`, `Con tus ${sm.shards} Ascension Shards: ${upNow.slice(0, 2).map(upName).join(", ")}`, "skills");
+  else if (sm.shards > 0 && ups.length) {
+    // La que más suma de las que podrás pagar con el punto del próximo nivel (la lista ya va por ganancia)
+    const next = ups.find((x) => x.up.points <= sm.free + 1 && x.up.shards <= sm.shards && !/tier/.test(x.upReason || "")) || ups[0];
+    add(3, "bolt", `Tienes ${sm.shards} Ascension Shard${sm.shards > 1 ? "s" : ""} sin usar`, `Subir de rango también gasta puntos de skill y te quedan ${sm.free}: con el próximo nivel, ${upName(next)}`, "skills");
+  }
+  if (sm.free > 0) add(2, "bolt", `${sm.free} punto${sm.free > 1 ? "s" : ""} de skill sin gastar`, upNow.length ? "Para aprender skills nuevas o subir de rango las tuyas" : "Hay skills disponibles para aprender", "skills");
 
   if (has("activity")) {
     const m = missionModel();
@@ -509,6 +518,13 @@ function ticketPlan() {
     projMax: current != null ? current + (todayPotential || (avgBase + extra) * deliveriesPerDay) * daysLeft + doubles.length * (avgBase + extra) * deliveriesPerDay : null };
 }
 
+// Coste de una expansión con sus boosts (expandLand.ts / vipAccess.ts). También lo usa la calculadora de Guías → Expansiones
+const expBoosted = (r, { grinx, vip, vipTime, monument }) => r && {
+  ...r,
+  resources: Object.fromEntries(Object.entries(r.resources).map(([k, v]) => [k, grinx && k !== "Gem" ? v / 2 : v])),
+  coins: vip ? Math.max(0, r.coins - Math.max(500, Math.floor(r.coins * 0.2))) : r.coins,
+  seconds: r.seconds * (monument ? 0.8 : 1) * (vipTime ? 0.9 : 1),
+};
 // Expansión: siguiente parcela y camino a la siguiente isla
 function expansionModel() {
   const farm = store.farm.data.farm;
@@ -527,12 +543,7 @@ function expansionModel() {
   const placed = new Set(placedCollectibles(farm)), vip = isVip();
   const grinx = placed.has("Grinx's Hammer"), monument = placed.has("Ascension Monument"), vipTime = vip && currentChapter() === "Ascension Age";
   const expBoosts = [grinx && "Grinx's Hammer: mitad de recursos", vip && "VIP: −500 coins o −20%", vipTime && "VIP en Ascension Age: −10% de tiempo", monument && "Ascension Monument: −20% de tiempo (con sus cheers completos)"].filter(Boolean);
-  const boosted = (r) => r && {
-    ...r,
-    resources: Object.fromEntries(Object.entries(r.resources).map(([k, v]) => [k, grinx && k !== "Gem" ? v / 2 : v])),
-    coins: vip ? Math.max(0, r.coins - Math.max(500, Math.floor(r.coins * 0.2))) : r.coins,
-    seconds: r.seconds * (monument ? 0.8 : 1) * (vipTime ? 0.9 : 1),
-  };
+  const boosted = (r) => expBoosted(r, { grinx, vip, vipTime, monument });
   const req = boosted(table[nextN]);
   const next = req ? { n: nextN, req, rows: rowsFor(req.resources), coinsMiss: Math.max(0, req.coins - toNum(farm.coins)), levelOk: bumpkinLevel(toNum(farm.bumpkin?.experience)).lvl >= req.level } : null;
   const up = G.islandUpgrade?.[island];

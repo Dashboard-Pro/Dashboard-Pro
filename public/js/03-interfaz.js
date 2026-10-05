@@ -166,9 +166,12 @@ function money(flower, d = 0) {
   return `≈ ${eur ? `${fmt(flower * eur, d)} € · ` : ""}$${fmt(flower * usd, d)}`;
 }
 // Precio de una gema en FLOWER: el paquete más barato por gema de la tienda (sfl.world)
+// FLOWER por gema: el paquete elegido en Misiones (S.gemPack = nº de gemas del paquete) o, por defecto, el más barato
+S.gemPack = readLS("gemPack", "");
 function flowerPerGem() {
   const packs = Object.values(store.fx?.data?.gems || {}).filter((p) => p.gem > 0 && p.sfl > 0);
-  return packs.length ? Math.min(...packs.map((p) => p.sfl / p.gem)) : null;
+  const sel = S.gemPack && packs.find((p) => String(p.gem) === String(S.gemPack));
+  return sel ? sel.sfl / sel.gem : packs.length ? Math.min(...packs.map((p) => p.sfl / p.gem)) : null;
 }
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -405,6 +408,30 @@ function renderViewBanner() {
 /* ════════════════════════════════════════════════════════════════════════
    8. Widgets compartidos
    ════════════════════════════════════════════════════════════════════════ */
+// Lo que vale lo que está listo: unidades medias con tus boosts (sfl.world) × floor de hoy. Solo lo que sale con precio
+// (cultivos, frutales, invernadero, nodos y comida); animales, compost, flores… se cuentan pero no se valoran.
+const READY_NODE = { trees: "Wood", stones: "Stone", iron: "Iron", gold: "Gold", crimstones: "Crimstone", sunstones: "Sunstone", oil: "Oil" };
+function timerValue(x) {
+  if (!has("activity")) return null;
+  const grp = { crops: "crops", fruits: "fruits", greenhouse: "greenhouse" }[x.cat];
+  const item = READY_NODE[x.cat] || (grp || x.cat === "cooking" ? x.name : null);
+  if (!item) return null;
+  const qty = x.cat === "cooking" ? 1 : yieldOf(grp || "resources", item) ?? 1;
+  const p = priceBook()(item).v;
+  return p == null ? null : { item, qty, v: qty * p };
+}
+function readyValue(timers) {
+  const t = now(), by = {};
+  let total = 0;
+  for (const x of timers) {
+    if (x.ready > t) continue;
+    const v = timerValue(x);
+    if (!v) continue;
+    by[x.cat] = (by[x.cat] || 0) + v.v;
+    total += v.v;
+  }
+  return { total, by };
+}
 function wReadyNow() {
   const f = store.farm.data;
   const per = perCategory(f.timers);
@@ -413,23 +440,26 @@ function wReadyNow() {
   const t = now();
   const within = (h) => f.timers.filter((x) => x.ready > t && x.ready <= t + h * 3600_000).length;
   setSub("ov-ready", `${f.timers.length} activos`);
+  const val = readyValue(f.timers);
   return `<div class="fill"><div class="hero-ready"><div class="big ${total ? "green" : "parch"}">${total}</div>
-      <div class="lbl"><b>${total ? "para recoger ahora" : "todo está creciendo"}</b><span class="ctx">${hot.length} de ${Object.keys(per).length} categorías con algo listo</span></div></div>
-    ${hot.length ? `<div class="rchips">${hot.map(([k, v]) => `<button class="rchip" data-go="farm" data-filter="${k}" title="Ver ${CATS[k].label} en Granja">${sprite(CATS[k].spr, 14)}<b>${v.ready}</b>${CATS[k].label}</button>`).join("")}</div>`
+      <div class="lbl"><b>${total ? "para recoger ahora" : "todo está creciendo"}</b><span class="ctx">${hot.length} de ${Object.keys(per).length} categorías con algo listo</span>${val.total > 0 ? `<span class="ctx" data-tip="Lo que vale|Unidades medias con tus boosts × floor de hoy, de cultivos, frutales, invernadero, nodos y comida (sin comisión)|fuente: sfl.world + mercado" tabindex="0">≈ <b class="sun">${fmt(val.total, 2)} FLOWER</b> a precio de mercado</span>` : ""}</div></div>
+    ${hot.length ? `<div class="rchips">${hot.map(([k, v]) => `<button class="rchip" data-go="farm" data-filter="${k}" title="Ver ${CATS[k].label} en Granja">${sprite(CATS[k].spr, 14)}<b>${v.ready}</b>${CATS[k].label}${val.by[k] >= 0.005 ? `<small class="faint">≈${fmt(val.by[k], 2)}</small>` : ""}</button>`).join("")}</div>`
       : `<p class="ctx" style="margin:14px 0 0">Te avisamos cuando madure lo siguiente.</p>`}
     <div class="forecast push">${[[1, "1 h"], [3, "3 h"], [12, "12 h"]].map(([h, l]) => `<div><span class="eyebrow">en ${l}</span><b>+${within(h)}</b></div>`).join("")}</div></div>`;
 }
 
+// Icono de un temporizador: el del propio item (Olive, Banana Blast…) si el juego lo tiene; si no, el de su categoría
+const timerIcon = (u, size) => (G.itemImages?.[u.name] ? Gi(u.name, size, CATS[u.cat].spr) : sprite(CATS[u.cat].spr, size));
 function wNextUp() {
   const t = now();
   const up = groupTimers(store.farm.data.timers.filter((x) => x.ready > t)).slice(0, 5);
   if (!up.length) return Empty("sprout", "Nada creciendo", "Planta algo y aparecerá aquí.");
   const [first, ...rest] = up;
   setSub("ov-next", `a las ${hhmm(first.ready)}`);
-  return `<div class="next-hero"><div class="ico">${sprite(CATS[first.cat].spr, 32)}</div>
+  return `<div class="next-hero"><div class="ico">${timerIcon(first, 32)}</div>
       <div style="min-width:0"><div class="big parch" data-ready="${first.ready}">${dur(first.ready - t)}</div>
       <div class="ctx" style="margin-top:6px"><b>${esc(first.name)}</b>${first.count > 1 ? ` ×${first.count}` : ""} · ${CATS[first.cat].label}</div></div></div>
-    <div class="qlist">${rest.map((u) => `<div class="qrow">${sprite(CATS[u.cat].spr, 14)}<span class="nm">${esc(u.name)}${u.count > 1 ? `<em>×${u.count}</em>` : ""}</span><span class="at">${at(u.ready)}</span>${Cd(u.ready, "cd")}</div>`).join("")}</div>`;
+    <div class="qlist">${rest.map((u) => `<div class="qrow">${timerIcon(u, 14)}<span class="nm">${esc(u.name)}${u.count > 1 ? `<em>×${u.count}</em>` : ""}</span><span class="at">${at(u.ready)}</span>${Cd(u.ready, "cd")}</div>`).join("")}</div>`;
 }
 
 const STACK_COLORS = ["#f5c542", "#86e05c", "#6cb4ee", "#f0a24a", "#b596f0", "#f08bd0"];

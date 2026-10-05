@@ -25,13 +25,35 @@ const SIM_TEMP = /Shrine|Hourglass|Totem/; // temporales: no se simulan como com
 // Velocidad de la colmena (updateBeehives del juego): miel por día y colmena con una flor creciendo
 const HONEY_RATE = { "Queen Bee": 1, "Beekeeper Hat": 0.2, "skill:Hyper Bees": 0.1, "skill:Flowery Abode": 0.5 };
 const NODE_TOOL = { Wood: "Axe", Stone: "Pickaxe", Iron: "Stone Pickaxe", Gold: "Iron Pickaxe", Crimstone: "Gold Pickaxe", Sunstone: "Gold Pickaxe", Oil: "Oil Drill" };
+// Lo que te cuesta la herramienta de cada golpe con tus boosts (tools.ts + buffs): gratis con Foreman Beaver (hacha), Quarry
+// (piedra), Infernal Drill (petróleo) o Crimstone Spikes Hair (crimstone); Feller's Discount y Frugal Miner ×0,8 las coins;
+// Oil Rig cambia el cuero por 20 lana. Precio de los ingredientes: floor (o su receta).
+const TOOL_FREE = { Wood: "Foreman Beaver", Stone: "Quarry", Oil: "Infernal Drill", Crimstone: "Crimstone Spikes Hair" };
+function toolCostFor(item, own) {
+  const tool = NODE_TOOL[item];
+  if (!tool) return null;
+  if (own.has(TOOL_FREE[item])) return { tool, v: 0, free: TOOL_FREE[item] };
+  const r = G.recipes?.[tool];
+  if (!r) return { tool, v: null };
+  const price = priceBook(), notes = [];
+  let coins = r.coins;
+  if (tool === "Axe" && own.has("skill:Feller's Discount")) { coins *= 0.8; notes.push("Feller's Discount"); }
+  if (/Pickaxe$/.test(tool) && own.has("skill:Frugal Miner")) { coins *= 0.8; notes.push("Frugal Miner"); }
+  let items = r.items;
+  if (tool === "Oil Drill" && own.has("skill:Oil Rig")) { items = { ...items, Wool: 20 }; delete items.Leather; notes.push("Oil Rig"); }
+  let v = coins / coinRate();
+  for (const [k, q] of Object.entries(items)) { const p = price(k).v; if (p == null) return { tool, v: null }; v += p * q; }
+  return { tool, v, coins, items, notes };
+}
 
 // Nombres de boosts que tiene la granja: coleccionables colocados, ropa puesta (tuya y de ayudantes) y skills ("skill:…").
 // set.levels guarda el nivel de cada skill ("skill:Tree Charge" → 2) para calcular su efecto real.
 function ownedBoosts(farm) {
   const skills = farm.bumpkin?.skills || {};
   const owned = Object.keys(skills).filter((k) => toNum(skills[k]) > 0);
-  const set = new Set([...placedCollectibles(farm), ...wornWearables(farm).map((w) => w.name), ...owned.map((k) => `skill:${k}`)]);
+  // Un santuario colocado pero caducado ya no da su boost
+  const dead = new Set(tempsModelFor(farm).shrines.filter((x) => x.expired).map((x) => x.name));
+  const set = new Set([...placedCollectibles(farm).filter((n) => !dead.has(n)), ...wornWearables(farm).map((w) => w.name), ...owned.map((k) => `skill:${k}`)]);
   set.levels = Object.fromEntries(owned.map((k) => [`skill:${k}`, Math.max(1, Math.round(toNum(skills[k])))]));
   return set;
 }
@@ -145,9 +167,9 @@ function prodLines() {
   }
   // Nodos: todos los de cada tipo; la herramienta que gasta cada golpe (sin hacha con Foreman Beaver)
   for (const r of nodePlan()) {
-    const tool = r.item === "Wood" && own.has("Foreman Beaver") ? null : NODE_TOOL[r.item];
+    const tc = toolCostFor(r.item, own);
     add({ cat: "nodes", name: r.item, item: r.item, n: r.n, baseH: r.hours / Math.max(0.05, br.node[r.cat] ?? 1), measuredH: r.hours, measuredY: yieldOf("resources", r.item),
-      tags: [r.item, ...(["Stone", "Iron", "Gold"].includes(r.item) ? ["minerals"] : [])], cost: tool ? p(tool) ?? 0 : 0, costNote: tool || "sin herramienta" });
+      tags: [r.item, ...(["Stone", "Iron", "Gold"].includes(r.item) ? ["minerals"] : [])], cost: tc?.v ?? 0, costNote: !tc ? "sin herramienta" : tc.free ? `sin ${tc.tool} (${tc.free})` : tc.tool, tool: tc });
   }
   const out = { lines, plots, patches, pots, machine, beds, hives, season, own, tax: resourceTax(farm) };
   prodLines.c = { key, out };
@@ -232,6 +254,7 @@ PAGES.production = function production() {
       ${Mod({ id: "pr-crops", span: 12, title: "Cultivos", icon: "carrot", flush: true, act: `<span class="ctx">Entro cada</span>${Seg(VISITS, S.visitH, "visit")}` })}
     </div>
     <div class="plate">${Mod({ id: "pr-nodes", span: 12, title: "Recursos", icon: "tree", flush: true })}</div>
+    <div class="plate">${Mod({ id: "pr-own", span: 12, title: "Picar tú o comprar", icon: "hammer", flush: true })}</div>
     <div class="plate">${Mod({ id: "pr-fruits", span: 12, title: "Frutas", icon: "apple", flush: true })}</div>
     <div class="plate">${Mod({ id: "pr-greenhouse", span: 12, title: "Invernadero", icon: "pot", flush: true })}</div>
     <div class="plate">${Mod({ id: "pr-machine", span: 12, title: "Crop Machine", icon: "machine", flush: true })}</div>
@@ -239,7 +262,29 @@ PAGES.production = function production() {
   const deps = { deps: ["farm", "activity"], soft: ["myBoosts"], loading: "rows" };
   mount("pr-k", { ...deps, render: wProdKpis, loading: "block" });
   for (const cat of ["crops", "fruits", "nodes", "greenhouse", "machine", "flowers"]) mount(`pr-${cat}`, { ...deps, render: () => prodTable(cat) });
+  mount("pr-own", { ...deps, render: wOwnCost });
 };
+// Coste propio de cada recurso (herramienta ÷ lo que da cada golpe) frente al mercado: comprarlo cuesta el floor; venderlo te
+// deja el floor menos la comisión de tu isla. Si te sale más barato que comprarlo, guárdalo para ti; si venderlo deja más
+// que la herramienta, picar para vender también compensa.
+function wOwnCost() {
+  const m = prodLines(), tax = m.tax;
+  const rows = m.lines.filter((l) => l.cat === "nodes").map((l) => {
+    const unit = l.tool?.v != null && l.amt > 0 ? l.tool.v / l.amt : null, net = l.p != null ? l.p * (1 - tax) : null;
+    return { ...l, unit, net, save: unit != null && l.p ? 1 - unit / l.p : null, margin: unit != null && net != null ? net - unit : null };
+  });
+  if (!rows.length) return Empty("tree", "Sin nodos", "Cuando tengas árboles o rocas, aquí verás si te sale más barato picar o comprar.");
+  return `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Recurso</th><th>Herramienta</th><th class="r">Por golpe</th><th class="r">Coste por golpe</th>
+    <th class="r" data-tip="Coste propio|Lo que te cuesta cada unidad: la herramienta repartida entre lo que da cada golpe con tus boosts|" tabindex="0">Te cuesta</th><th class="r">Comprarlo</th>
+    <th class="r" data-tip="Venderlo|Floor menos la comisión de tu isla (${fmt(tax * 100, 1)}%)|" tabindex="0">Venderlo</th><th>Mejor</th></tr></thead><tbody>
+    ${rows.map((r) => `<tr><td class="w">${Gi(r.item, 18)} ${esc(r.item)}</td>
+      <td class="ctx">${!r.tool ? "—" : r.tool.free ? `<span class="up">gratis</span> · ${esc(r.tool.free)}` : `${Gi(r.tool.tool, 14)} ${esc(r.tool.tool)}${r.tool.notes?.length ? ` <span class="faint">(${esc(r.tool.notes.join(", "))})</span>` : ""}`}</td>
+      <td class="r mono">${fmt(r.amt, 2)}</td><td class="r mono">${r.tool?.v == null ? "—" : fmt(r.tool.v, 4)}</td>
+      <td class="r mono"><b>${r.unit == null ? "—" : fmt(r.unit, 4)}</b></td><td class="r mono">${r.p == null ? "—" : fmt(r.p, 4)}</td><td class="r mono">${r.net == null ? "—" : fmt(r.net, 4)}</td>
+      <td class="ctx">${r.unit == null || r.p == null ? "—" : r.margin > 0 ? `<span class="up">picar y vender</span> · +${fmt(r.margin / r.unit * 100, 0)}% sobre la herramienta` : r.save > 0 ? `<span class="sun">picar para usarlo</span> · ${fmt(r.save * 100, 0)}% más barato que comprarlo` : `<span class="down">comprarlo</span> · picar sale ${fmt(-r.save * 100, 0)}% más caro`}</td></tr>`).join("")}
+  </tbody></table></div>
+  <div class="mod-f"><span>Herramienta = coins a ${fmt(coinRate(), 0)}/FLOWER + ingredientes a floor, con Feller's Discount, Frugal Miner, Oil Rig y las que la quitan (Foreman Beaver, Quarry, Infernal Drill, Crimstone Spikes Hair)</span><span>tools.ts</span></div>`;
+}
 PAGE_META.production = { title: "Producción", sub: () => `${staleNote()}Lo que te deja cada cultivo, fruta, maceta, máquina, flor y recurso en FLOWER al día, con tus boosts y los precios de hoy` };
 
 /* ── Simulador ──
@@ -283,6 +328,22 @@ function simModel() {
   const withSel = sel.length ? prodTotals(m, simAdj(sel, m.own)) : base;
   const selCost = sel.filter((n) => !m.own.has(n)).reduce((a, n) => a + (price(n).v || 0), 0);
   return { base, withSel, sel, selCost, cands, own: m.own };
+}
+// Lo que suma al día subir cada skill tuya un rango (FLOWER/día sobre tu producción de hoy). Solo las que tienen efecto
+// calculable en Producción; las demás (cocina, poderes, coins…) no salen. Para Skills → Subir de rango y el plan de acción.
+function skillUpGains() {
+  try {
+    const m = prodLines();
+    if (skillUpGains.c?.m === m) return skillUpGains.c.out;
+    const base = prodTotals(m).total, out = {};
+    for (const n of Object.keys(G.boostFx || {})) {
+      const lv = m.own.levels?.[n];
+      if (!n.startsWith("skill:") || !lv || lv >= skillMaxLevel(n)) continue;
+      out[n.slice(6)] = prodTotals(m, simAdj([`${n}@${lv + 1}`], m.own)).total - base;
+    }
+    skillUpGains.c = { m, out };
+    return out;
+  } catch { return {}; }
 }
 function wSimKpis() {
   const s = simModel(), d = s.withSel.total - s.base.total;

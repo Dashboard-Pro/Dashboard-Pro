@@ -241,9 +241,45 @@ function wChBounties() {
   </tbody></table></div>`;
 }
 
+// Proyección hasta el final del capítulo por fuente (como el Chapter Race de sfl-calculator): lo máximo que puedes sacar
+// si haces todo lo que da tickets cada día/semana, y lo que cuesta. Entregas = una por NPC de tickets al día (×2 en los
+// días dobles del calendario); tareas y bounties = las de esta semana repetidas cada semana que queda; cofre = 1 al día.
+function wChProjection() {
+  const d = chapterModel();
+  if (!d) return "";
+  const t = now(), end = d.c.end, days = Math.max(0, d.daysLeft), weeks = days / 7;
+  const npcs = Object.keys(G.ticketRewards || {});
+  const perDay = npcs.reduce((s, n) => s + G.ticketRewards[n] + d.extra, 0);
+  const doubles = calendarEvents().filter((e) => e.name === "doubleDelivery" && Date.parse(e.date) > t && Date.parse(e.date) < end).length;
+  const deliveredToday = d.m.orders.filter((o) => G.ticketRewards?.[o.from] && sameUtcDay(o.completedAt)).length;
+  const priced = d.m.ticketOrders.filter((o) => o.perTicket != null);
+  const avgCost = priced.length ? priced.reduce((s, o) => s + o.perTicket * o.tickets, 0) / priced.reduce((s, o) => s + o.tickets, 0) : null;
+  const choreWeek = d.chores.reduce((s, b) => s + b.tickets, 0), choreLeft = d.chores.filter((b) => !b.completedAt).reduce((s, b) => s + b.tickets, 0);
+  const bountyWeek = d.bountiesAll.reduce((s, b) => s + b.tickets, 0), bountyLeft = d.bountiesAll.filter((b) => !b.soldAt).reduce((s, b) => s + b.tickets, 0);
+  const restWeeks = Math.max(0, weeks - (7 - ((new Date(t).getUTCDay() + 6) % 7)) / 7);
+  const rows = [
+    ["Entregas de tickets", `${deliveredToday}/${npcs.length} hoy`, perDay, perDay * days + perDay * doubles, avgCost != null ? avgCost * (perDay * days + perDay * doubles) : null, `${npcs.length} NPCs · ${fmt(perDay, 0)} al día${doubles ? ` · ${doubles} días dobles` : ""}`],
+    ["Tareas de la semana", `${d.chores.filter((b) => b.completedAt).length}/${d.chores.length}`, choreWeek / 7, choreLeft + choreWeek * restWeeks, null, "las de esta semana, cada semana"],
+    ["Bounties", `${d.bountiesAll.filter((b) => b.soldAt).length}/${d.bountiesAll.length}`, bountyWeek / 7, bountyLeft + bountyWeek * restWeeks, null, "los de esta semana, cada semana"],
+    ["Cofre diario", sameUtcDay(store.farm.data.farm.dailyRewards?.chest?.collectedAt) ? "hoy ✓" : "hoy pendiente", 1, days, null, "1 al día si el cofre da ticket del capítulo"],
+  ];
+  const left = rows.reduce((s, r) => s + r[3], 0), cost = rows.reduce((s, r) => s + (r[4] || 0), 0);
+  return `<div class="kstrip">
+      ${Kcell("Llevas", fmt(d.collected ?? 0, 0), "ganados en el capítulo")}
+      ${Kcell("Puedes sacar aún", `+${fmt(left, 0)}`, `en ${fmt(days, 0)} días haciéndolo todo`, "sun")}
+      ${Kcell("Total posible", fmt((d.collected ?? 0) + left, 0), d.pace != null ? `a tu ritmo: ${fmt((d.collected ?? 0) + d.pace * days, 0)}` : "")}
+      ${Kcell("Coste de las entregas", avgCost != null ? `${fmt(cost, 1)}<small>FLW</small>` : "—", avgCost != null ? `a ${fmt(avgCost, 3)} FLW/ticket (tus pedidos de hoy)` : "")}
+    </div>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Fuente</th><th class="r">Hecho</th><th class="r">Al día</th><th class="r">Quedan</th><th class="r">Coste</th><th>Cómo</th></tr></thead><tbody>
+    ${rows.map(([n, done, pd, l, c, how]) => `<tr><td class="w">${esc(n)}</td><td class="r mono">${done}</td><td class="r mono">${fmt(pd, 1)}</td><td class="r mono"><b>${fmt(l, 0)}</b></td><td class="r mono">${c == null ? "—" : fmt(c, 1)}</td><td class="ctx">${esc(how)}</td></tr>`).join("")}
+    </tbody></table></div>
+    <div class="mod-f"><span>Máximo si haces todas las entregas, tareas y bounties hasta el final (con VIP y tus objetos de boost del capítulo) · el coste de las tareas y bounties varía demasiado y no se cuenta</span><span>deliver.ts · completeNPCChore.ts</span></div>`;
+}
+
 PAGES.chapter = function chapter() {
   $("#page").innerHTML = `
     <div class="plate">${Mod({ id: "ch-k", span: 12, flush: true })}</div>
+    <div class="plate">${Mod({ id: "ch-proj", span: 12, title: "Hasta el final del capítulo", icon: "ticket", flush: true })}</div>
     <div class="plate">
       ${Mod({ id: "ch-shop", span: 8, title: "Tienda de Stella", icon: "chest", flush: true })}
       ${Mod({ id: "ch-goals", span: 4, title: "Tus metas", icon: "star" })}
@@ -259,6 +295,7 @@ PAGES.chapter = function chapter() {
     <div class="plate">${Mod({ id: "ch-chores", span: 12, title: "Tareas semanales", icon: "check", flush: true })}</div>`;
   const o = { deps: ["farm"], soft: ["activity", "tickets"] };
   mount("ch-k", { ...o, render: wChKpis, loading: "block" });
+  mount("ch-proj", { ...o, render: wChProjection, loading: "rows" });
   mount("ch-shop", { ...o, render: wChShop, loading: "rows" });
   mount("ch-goals", { ...o, render: wChGoals, loading: "block" });
   mount("ch-track", { ...o, render: wChTrack, loading: "rows" });

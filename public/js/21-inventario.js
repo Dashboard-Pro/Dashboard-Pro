@@ -3,7 +3,7 @@
 // Scripts clásicos que comparten el ámbito global en el orden de index.html.
 "use strict";
 
-const INV_TABS = [["summary", "Resumen"], ["sell", "Vender o guardar"], ["changes", "Cambios"], ["make", "Qué puedes hacer"]];
+const INV_TABS = [["summary", "Resumen"], ["sell", "Vender o guardar"], ["sim", "Simular venta"], ["changes", "Cambios"], ["make", "Qué puedes hacer"]];
 S.invTab = readLS("invTab", "summary");
 S.invCat = "all";
 S.invMake = readLS("invMake", "food");
@@ -117,10 +117,42 @@ function invMake() {
     <h4 class="acc-h">Puedes hacer ahora</h4>${now_.length ? `<div class="inv-top">${now_.slice(0, 24).map((r) => `<div class="inv-card">${Gi(r.name, 28)}<b>${esc(r.name)}</b><span class="ctx">×${r.n}</span>${r.cost != null ? `<span class="ctx">ingredientes ${fmt(r.cost, 2)} FLW</span>` : ""}</div>`).join("")}</div>` : `<p class="ctx">Nada con lo que tienes ahora mismo.</p>`}
     <h4 class="acc-h">Te falta un ingrediente</h4>${one.length ? one.slice(0, 40).map((r) => `<div class="bst-row"><span class="nm">${Gi(r.name, 14)} ${esc(r.name)}</span><span class="tag">te falta ${compact(r.miss[0][1])} ${esc(r.miss[0][0])}</span></div>`).join("") : `<p class="ctx">Nada.</p>`}`;
 }
+// Simular venta: vender un % de todo lo que tiene precio de mercado, con la comisión de verdad (recursos: la de tu isla, a la
+// mitad con VIP y −2,5 con el Trading Shrine; lo demás 10%) y cómo cambia con o sin VIP / Trading Shrine
+S.invPct = Number(readLS("invPct", 100)) || 100;
+S.invSimSel = S.invSimSel || {};
+function invSim(m) {
+  const farm = store.farm.data.farm, isl = farm.island?.type || "basic";
+  const isRes = (n) => (G.tradeResources || []).includes(n);
+  const taxOf = (n, vip, shrine) => (isRes(n) ? Math.max(0, (ISLAND_TAX[isl] ?? 0.15) * (vip ? 0.5 : 1) - (shrine ? 0.025 : 0)) : 0.1);
+  const vipNow = (farm.vip?.expiresAt || 0) > now(), shrineNow = tempWindows(farm).some((w) => w.name === "Trading Shrine" && w.from <= now() && w.to > now());
+  const price = priceBook();
+  const rows = m.rows.filter((r) => r.price != null && price(r.name).src === "mercado" && S.invSimSel[r.name] !== false).map((r) => {
+    const q = r.qty * (S.invPct / 100), gross = q * r.price;
+    return { ...r, q, gross, tax: taxOf(r.name, vipNow, shrineNow), net: gross * (1 - taxOf(r.name, vipNow, shrineNow)) };
+  });
+  const sum = (vip, shrine) => rows.reduce((s, r) => s + r.gross * (1 - taxOf(r.name, vip, shrine)), 0);
+  const gross = rows.reduce((s, r) => s + r.gross, 0), net = sum(vipNow, shrineNow);
+  const scen = [["Sin VIP ni shrine", false, false], ["Con VIP", true, false], ["Con Trading Shrine", false, true], ["Con los dos", true, true]];
+  return `<div class="toolbar" style="padding:0 0 10px;gap:10px;flex-wrap:wrap"><span class="ctx">Vender</span>${SegAct([[25, "25%"], [50, "50%"], [100, "100%"]], S.invPct, "invpct")}
+      <span class="ctx">de todo lo que tiene precio de mercado · isla ${esc(ISLAND_ES[isl] || isl)} (${fmt((ISLAND_TAX[isl] ?? 0.15) * 100, 0)}% en recursos)</span></div>
+    <div class="kstrip">
+      ${Kcell("Bruto", `${fmt(gross, 2)}<small>FLW</small>`, `${rows.length} objetos`)}
+      ${Kcell("Comisión", `−${fmt(gross - net, 2)}<small>FLW</small>`, gross ? `${fmt(((gross - net) / gross) * 100, 1)}% de media` : "", "red")}
+      ${Kcell("Te queda", `${fmt(net, 2)}<small>FLW</small>`, money(net), "sun")}
+    </div>
+    <div class="kstrip">${scen.map(([l, v, s]) => Kcell(l, `${fmt(sum(v, s), 2)}<small>FLW</small>`, v === vipNow && s === shrineNow ? "lo que tienes hoy" : `${signed(sum(v, s) - net, 2)} frente a ahora`, v === vipNow && s === shrineNow ? "sun" : "")).join("")}</div>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Objeto</th><th class="r">Vendes</th><th class="r">Precio</th><th class="r">Bruto</th><th class="r">Comisión</th><th class="r">Neto</th></tr></thead><tbody>
+      ${rows.sort((a, b) => b.net - a.net).map((r) => `<tr><td class="w">${Gi(r.name, 20)} ${esc(r.name)}</td><td class="r mono">${compact(r.q)}</td><td class="r mono dim">${fmt(r.price, r.price < 0.01 ? 5 : 3)}</td>
+        <td class="r mono">${fmt(r.gross, 3)}</td><td class="r mono dim">${fmt(r.tax * 100, 1)}%</td><td class="r mono"><b>${fmt(r.net, 3)}</b></td></tr>`).join("")}
+    </tbody></table></div>`;
+}
+ACTIONS.invpct = (v) => { S.invPct = Number(v); writeLS("invPct", S.invPct); rerun(); };
 function wInvBody() {
   const m = invModel();
   setSub("inv-body", `${m.rows.length} objetos`);
   if (S.invTab === "sell") return invSell(m);
+  if (S.invTab === "sim") return has("activity") ? invSim(m) : Empty("coin", "Sin precios", "Cargando los precios del mercado…");
   if (S.invTab === "changes") return invChanges(m);
   if (S.invTab === "make") return invMake();
   return invSummary(m);

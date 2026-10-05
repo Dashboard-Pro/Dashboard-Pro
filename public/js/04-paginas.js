@@ -32,6 +32,10 @@ const PAGES = {
         ${Mod({ id: "ov-pending", span: 6, title: "Pendientes y metas", icon: "scroll" })}
       </div>
       <div class="plate">
+        ${Mod({ id: "ov-projects", span: 7, title: "Proyectos del pueblo", icon: "hammer", flush: true })}
+        ${Mod({ id: "ov-temps", span: 5, title: "Santuarios y temporales", icon: "bolt" })}
+      </div>
+      <div class="plate">
         ${Mod({ id: "ov-mini", span: 6, title: "Minijuegos", icon: "star", flush: true })}
         ${Mod({ id: "ov-activity", span: 3, title: "Actividad", icon: "chest" })}
         ${Mod({ id: "ov-stock", span: 3, title: "Stock en las tiendas", icon: "coin" })}
@@ -45,10 +49,12 @@ const PAGES = {
     mount("ov-check", { deps: ["farm"], render: wChecklist, loading: "rows" });
     mount("ov-faction", { deps: ["farm"], soft: ["activity"], render: wFactionWeek, loading: "rows" });
     mount("ov-pending", { deps: ["farm"], soft: ["activity", "auctions"], render: wPending, loading: "rows" });
+    mount("ov-projects", { deps: ["farm"], soft: ["activity"], render: wProjects, loading: "rows" });
+    mount("ov-temps", { deps: ["farm"], render: wTemps, loading: "rows" });
     mount("ov-mini", { deps: ["farm"], render: wMinigames, loading: "rows" });
     mount("ov-activity", { deps: ["farm"], render: wActivity, loading: "block" });
     mount("ov-stock", { deps: ["farm"], render: wShopStock, loading: "block" });
-    mount("ov-ready", { deps: ["farm"], render: wReadyNow, loading: "hero" });
+    mount("ov-ready", { deps: ["farm"], soft: ["activity", "myBoosts"], render: wReadyNow, loading: "hero" });
     mount("ov-next", { deps: ["farm"], render: wNextUp, loading: "hero" });
     mount("ov-wealth", { deps: ["farm", "activity"], soft: ["activityPrev", "fx"], render: wWealth, loading: "hero" });
     mount("ov-tl", { deps: ["farm"], render: (el) => wTimeline(el, true) });
@@ -112,7 +118,7 @@ const PAGES = {
     mount("ms-k", { deps: ["farm", "activity"], render: wMissionKpis, loading: "block" });
     mount("ms-tabs", { deps: ["farm", "activity"], render: missionTabs, loading: "block" });
     // Se repinta al llegar los precios: el valor automático de las coins sale de ellos
-    mount("ms-settings", { deps: ["farm", "activity"], render: missionSettings, loading: "block" });
+    mount("ms-settings", { deps: ["farm", "activity"], soft: ["fx"], render: missionSettings, loading: "block" });
     mount(t.id, { deps: ["farm", "activity"], render: t.render, loading: "rows" });
   },
 
@@ -123,6 +129,7 @@ const PAGES = {
         ${Mod({ id: "sk-trees", span: 8, title: "Árboles", icon: "bolt", flush: true })}
         ${Mod({ id: "sk-powers", span: 4, title: "Poderes", icon: "bolt", flush: true })}
       </div>
+      <div class="plate">${Mod({ id: "sk-ranks", span: 8, title: "Subir de rango", icon: "bolt", flush: true })}${Mod({ id: "sk-shards", span: 4, title: "Shards y reinicio", icon: "gem" })}</div>
       <div class="plate">
         <section class="mod s-12">
           <header class="mod-h">${sprite("sun", 16)}<h2 id="sk-tree-title">Árbol</h2><span class="sub" id="sk-tree-sub"></span></header>
@@ -132,6 +139,8 @@ const PAGES = {
     mount("sk-k", { deps: ["farm"], render: wSkillKpis, loading: "block" });
     mount("sk-trees", { deps: ["farm"], render: wTrees, loading: "rows" });
     mount("sk-powers", { deps: ["farm"], render: wPowers, loading: "rows" });
+    mount("sk-shards", { deps: ["farm"], render: wSkillShards, loading: "rows" });
+    mount("sk-ranks", { deps: ["farm"], soft: ["activity"], render: wSkillRanks, loading: "rows" });
     mount("sk-tree", { deps: ["farm"], render: wTreeDetail, loading: "rows" });
   },
 

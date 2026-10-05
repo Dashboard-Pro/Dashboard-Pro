@@ -155,19 +155,37 @@ function digSolve({ patterns, holes, width = 10, height = 10, budget = 400_000, 
   if (!impossible) {
     try { walk(); } catch (e) {
       if (e !== digSolve.TOO_MANY) throw e;
-      // Demasiadas combinaciones: muestras al azar (cada patrón en una de sus posiciones) y se quedan las que encajan
+      // Demasiadas combinaciones: muestras al azar que siguen el mismo árbol que el recorrido exacto (cubrir la primera
+      // pista libre con una opción al azar, luego los patrones sueltos donde quepan). Cada muestra pesa el producto de las
+      // opciones que tenía en cada paso (estimador de Knuth), así las probabilidades no se sesgan hacia ramas estrechas.
+      // Colocar los 8 patrones al azar y quedarse con los que encajan casi nunca acierta cuando hay muchas pistas.
       exact = false;
       total = 0; hit.fill(0); itemHit.clear(); posCount.forEach((x) => x.fill(0));
-      for (let s = 0; s < samples * 50 && total < samples; s++) {
-        occ.fill(-1);
-        let ok = true;
-        for (let k = 0; k < P && ok; k++) {
-          const n = Math.floor(rng() * cands[k].length);
-          if (cands[k][n].cells.some((j) => occ[j] >= 0)) ok = false;
-          else put(k, n, k);
+      const pick = (opts) => opts[Math.floor(rng() * opts.length)];
+      for (let s = 0, good = 0; s < samples * 20 && good < samples; s++) {
+        occ.fill(-1); placed.fill(-1); blocked.forEach((b) => b.fill(0));
+        let w = 1;
+        for (;;) {
+          const r = reqs.find((q) => !q.cells.some((j) => occ[j] >= 0));
+          const opts = [];
+          if (r) {
+            for (let k = 0; k < P; k++) if (placed[k] < 0) cands[k].forEach((c, n) => { if (c.cells.some((j) => r.cells.includes(j)) && fits(k, c)) opts.push([k, n]); });
+          } else {
+            const k = placed.indexOf(-1);
+            if (k < 0) break;
+            cands[k].forEach((c, n) => { if (fits(k, c)) opts.push([k, n]); });
+          }
+          if (!opts.length) { w = 0; break; }
+          w *= opts.length;
+          const [k, n] = pick(opts);
+          put(k, n, k);
+          if (r) for (let i = 0; i < k; i++) if (placed[i] < 0) for (const j of r.cells) blocked[i][j]++;
         }
-        if (ok && reqs.every((q) => q.cells.some((j) => occ[j] >= 0))) { total++; for (let k = 0; k < P; k++) addCand(k, placed[k], 1); }
+        if (!w) continue;
+        good++; total += w;
+        for (let k = 0; k < P; k++) addCand(k, placed[k], w);
       }
+      blocked.forEach((b) => b.fill(0));
     }
   }
 

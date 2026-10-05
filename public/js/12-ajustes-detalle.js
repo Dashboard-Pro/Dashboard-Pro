@@ -69,6 +69,8 @@ async function openItem(key) {
   openDrawer(head() + (m ? Loading("hero") + Loading("rows", 6) : Empty("coin", "Sin detalle", "La API no ofrece libro de órdenes para este tipo de item.")));
   if (!m) return;
   try {
+    // El resumen del volcado (local, ~100 KB) dice en cuántas granjas activas está el item
+    if (!has("dump")) await LOADERS.dump().catch(() => null);
     const { data: d } = await data("tradeable", { collection: m[1], id: m[2] });
     const hist = d.history?.history || {};
     const days = Object.values(hist.dates || {}).sort((a, b) => a.date.localeCompare(b.date));
@@ -107,6 +109,7 @@ async function openItem(key) {
         ${Kcell("Volumen 7 d", compact(week), `${fmt(days.reduce((s, x) => s + (x.sales || 0), 0), 0)} ventas`)}
         ${Kcell("Supply", d.supply != null ? compact(d.supply) : "∞", `${compact(hist.totalSales)} ventas totales`)}
         ${qty ? Kcell("Tienes", fmt(qty), `≈ ${fmt(qty * (d.floor || 0), 1)} FLOWER`) : ""}
+        ${(() => { const c = (m[1] === "wearables" ? store.dump?.data?.wearables : store.dump?.data?.items)?.[name]; return c ? Kcell("En granjas activas", fmt(c[1], 0), `${compact(c[0])} unidades · volcado del ${esc(store.dump.data.date)}`) : ""; })()}
       </div>
       ${me ? mySection : ""}
       ${alertBox(key, name, d.floor)}
@@ -379,14 +382,18 @@ function closeSearch() { $("#searchRes").hidden = true; }
    12. Notificaciones
    ════════════════════════════════════════════════════════════════════════ */
 const timerKey = (x) => `${x.cat}|${x.id ?? x.name}|${x.ready}`;
+// Avisar unos minutos antes (Ajustes de Granja: al momento, 5, 15 o 30 min antes); vale para el navegador y Discord
+S.notifyEarly = Number(readLS("notifyEarly", 0)) || 0;
+const notifyLead = () => S.notifyEarly * 60_000;
 function primeNotified(timers) {
   const t = now();
-  S.notified = new Set(timers.filter((x) => x.ready <= t).map(timerKey));
+  S.notified = new Set(timers.filter((x) => x.ready - notifyLead() <= t).map(timerKey));
 }
+ACTIONS.notifyearly = (v) => { S.notifyEarly = Number(v) || 0; writeLS("notifyEarly", S.notifyEarly); if (has("farm")) primeNotified(store.farm.data.timers); rerun(); toast(S.notifyEarly ? `Te avisaremos ${S.notifyEarly} min antes` : "Te avisaremos al momento"); };
 function checkNotifications() {
   if (!has("farm") || S.viewing) return;
   const t = now();
-  const fresh = store.farm.data.timers.filter((x) => x.ready <= t && !S.notified.has(timerKey(x)));
+  const fresh = store.farm.data.timers.filter((x) => x.ready - notifyLead() <= t && !S.notified.has(timerKey(x)));
   if (!fresh.length) return;
   fresh.forEach((x) => S.notified.add(timerKey(x)));
   const byCat = {};
@@ -400,7 +407,9 @@ function checkNotifications() {
   if (!S.notify || !("Notification" in window) || Notification.permission !== "granted") return;
   for (const [k, list] of Object.entries(byCat)) {
     const body = groupTimers(list).map((g) => `${g.name}${g.count > 1 ? " ×" + g.count : ""}`).join(", ");
-    try { new Notification(`${CATS[k].label}: listo para recoger`, { body, tag: `sfl-${k}` }); } catch { /* ignorar */ }
+    const soon = list.filter((x) => x.ready > t);
+    const title = soon.length ? `${CATS[k].label}: listo en ${dur(Math.max(...soon.map((x) => x.ready)) - t)}` : `${CATS[k].label}: listo para recoger`;
+    try { new Notification(title, { body, tag: `sfl-${k}` }); } catch { /* ignorar */ }
   }
 }
 
