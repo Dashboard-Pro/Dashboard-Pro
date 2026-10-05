@@ -334,6 +334,8 @@ function wGuideGifts() {
     || `<div class="ctx">Le vale cualquier flor (+${n.fav[0]?.pts || 3} puntos)</div>`}${n.fav.length > 6 ? `<div class="faint">+${n.fav.length - 6} flores más que le gustan</div>` : ""}</div>`;
   return `<div class="cb-cards">${list.map((n) => ItemCard({
       name: NPC_ES(n.npc), icon: giftIcon(n.next) || n.fav[0]?.f || "Red Pansy", can: n.can,
+      // Retrato del NPC con su ropa del juego (npcs.ts), con el mismo servicio de imágenes que los Bumpkins
+      iconHtml: G.npcLooks?.[n.npc] ? `<img class="npc-face" src="${esc(bumpkinImageUrl(G.npcLooks[n.npc], 100))}" alt="" width="52" height="52" loading="lazy" onerror="this.remove()">` : null,
       tags: `${n.ready ? `<span class="tag green">regalo listo</span>` : ""}${n.giftedToday ? `<span class="tag">flor hoy ✓</span>` : ""}`,
       sub: n.next ? `Siguiente regalo a ${fmt(n.next.friendshipPoints, 0)}: ${giftTxt(n.next)}` : "no da regalos",
       body: favRows(n),

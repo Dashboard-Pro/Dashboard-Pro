@@ -1233,3 +1233,4 @@ button.xland:hover { border-color: var(--sun); }
 @media (max-width: 1080px) { .ly-wrap { grid-template-columns: 1fr; } .ly-side { border-left: 0; border-top: 1px solid var(--line); max-height: none; } }
 .cb-ing div.best span { color: var(--text); }
 .cb-ing em.tag { font-style: normal; margin-left: 4px; }
+.npc-face { width: 52px; height: 52px; image-rendering: pixelated; border: 1px solid var(--line); background: var(--bg); flex: none; }

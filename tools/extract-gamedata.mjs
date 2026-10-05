@@ -31,7 +31,7 @@ const NEEDED = [
   "types/monuments.ts", "types/petShop.ts", "types/resources.ts",
   "types/fermentation.ts", "types/spiceRack.ts", "types/fishProcessing.ts", "types/crustaceans.ts",
 ].map((f) => `src/features/game/${f}`).concat(["src/lib/i18n/dictionaries/es.json", "src/lib/i18n/dictionaries/en.json", "src/features/pets/data/pets-nfts.ts",
-  "src/assets/sunnyside.ts", "src/features/island/plots/lib/plant.ts", "src/features/island/delivery/lib/delivery.ts"]);
+  "src/assets/sunnyside.ts", "src/features/island/plots/lib/plant.ts", "src/features/island/delivery/lib/delivery.ts", "src/lib/npcs.ts"]);
 
 async function downloadSources(dest) {
   console.log(`Descargando ${NEEDED.length} archivos de github.com/sunflower-land/sunflower-land (main)…`);
@@ -765,6 +765,8 @@ tryData("forge", () => {
 });
 // Proyectos del pueblo (monuments.ts): ánimos que pide cada uno y lo que da al completarlo (fruta gigante, cajas de comida)
 tryData("projects", () => { const src = read("types/monuments.ts"); return { cheers: tsLiteral(src, "REQUIRED_CHEERS"), rewards: tsLiteral(src, "REWARD_ITEMS") }; });
+// Ropa de cada NPC (src/lib/npcs.ts → NPC_WEARABLES): para dibujar su retrato con el mismo servicio que los Bumpkins
+tryData("npcLooks", () => tsLiteral(fs.readFileSync(path.join(gameSrc, "..", "..", "lib", "npcs.ts"), "utf8"), "NPC_WEARABLES"));
 // Regalos a los NPCs (types/gifts.ts): flores que les gustan más, puntos por flor y premios por amistad
 tryData("npcGifts", () => {
   const src = read("types/gifts.ts").replace(/\bBB_TO_GEM_RATIO\b/g, String(chestConsts.BB_TO_GEM_RATIO));

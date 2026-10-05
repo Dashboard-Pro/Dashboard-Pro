@@ -207,6 +207,7 @@ ok(G.cropMachineSeeds?.basic?.includes("Sunflower Seed") && Object.keys(G.cropMa
 }
 ok(G.animals?.levels?.Chicken?.[1] > 0 && G.animals.foodXp?.Chicken?.[0]?.Hay > 0 && G.animals.drops?.Cow?.[5]?.Milk > 0 && G.animals.requiredQty?.Cow === 5, "reglas de animales (niveles, XP de comida, producción, raciones)");
 ok(G.animals?.foods?.["Barn Delight"]?.ingredients?.Lemon > 0 && G.animals.sleepHours > 0, "comida, medicina y sueño de los animales");
+ok(G.npcLooks?.betty?.body && Object.keys(G.npcLooks).length > 50, "ropa de los NPCs para su retrato (npcs.ts)");
 ok(G.skillUpgradePoints?.[1] === 1 && G.skillUpgradePoints[3] === 6 && G.skills?.["Chonky Scarecrow"]?.maxLevel === 3 && Object.values(G.skills).filter((s) => s.maxLevel > 1).length > 100,
   "rangos de las skills (máximo y puntos por subir con Ascension Shards)");
 ok(G.skills?.["Nom Nom"]?.ranks?.length === 3 && G.skills["Betty's Friend"].ranks[0] > 0, "valores por nivel de las skills (boosts de entrega)");

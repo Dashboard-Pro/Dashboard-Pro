@@ -24,8 +24,8 @@ const IngList = (items, mult = 1, coins = 0) => `<div class="cb-ing">${coins ? (
   return `<div title="${have == null ? "" : `tienes ${fmt(have, have % 1 ? 1 : 0)}`}">${Gi(n, 22)}<span>${esc(n)}</span><b class="${have == null ? "" : have >= need ? "up" : "down"}">×${fmt(need, need % 1 ? 1 : 0)}</b></div>`;
 }).join("") || (coins ? "" : `<div class="faint">nada</div>`)}</div>`;
 const CardStats = (cells) => `<div class="cb-stats" style="grid-template-columns:repeat(${cells.length},1fr)">${cells.map(([l, v, cls = ""]) => `<div><span>${l}</span><b class="${cls}">${v}</b></div>`).join("")}</div>`;
-const ItemCard = ({ icon, name, tags = "", sub = "", body, stats, can }) => `<div class="cb-card${can > 0 ? " can" : ""}">
-  <div class="cb-head">${Gi(icon || name, 40)}<div style="min-width:0"><b>${esc(name)}</b>${tags}${sub ? `<div class="ctx">${sub}</div>` : ""}</div></div>
+const ItemCard = ({ icon, iconHtml, name, tags = "", sub = "", body, stats, can }) => `<div class="cb-card${can > 0 ? " can" : ""}">
+  <div class="cb-head">${iconHtml || Gi(icon || name, 40)}<div style="min-width:0"><b>${esc(name)}</b>${tags}${sub ? `<div class="ctx">${sub}</div>` : ""}</div></div>
   <div class="cb-body">${body}</div>${stats ? CardStats(stats) : ""}</div>`;
 const canMake = (items, mult = 1, coins = 0) => (gFarm() ? Math.min(...Object.entries(items || {}).map(([k, q]) => Math.floor(haveOf(k) / (q * mult))), coins ? Math.floor(toNum(gFarm().coins) / (coins * mult)) : Infinity, Infinity) : null);
 const gTabs = (key, cur, opts) => `<div class="seg">${opts.map(([v, l]) => `<button data-act="${key}:${esc(String(v))}" class="${String(cur) === String(v) ? "on" : ""}">${l}</button>`).join("")}</div>`;
