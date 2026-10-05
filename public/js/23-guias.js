@@ -340,20 +340,31 @@ function wGuideGifts() {
 function wGuideFlowers() {
   const view = Seg([["flowers", "Flores"], ["gifts", "Regalos a NPCs"]], S.gflView, "act").replace(/data-act="([^"]+)"/g, 'data-act="gflv:$1"');
   if (S.gflView === "gifts") return `<div class="toolbar" style="padding:8px 12px">${view}</div>${wGuideGifts()}`;
-  const d = flowerGuideModel();
+  const d = flowerGuideModel(), farm = gFarm();
   const list = d.seeds.filter((s) => S.gflSeason === "all" || !s.seasons.length || s.seasons.length === 4 || s.seasons.includes(S.gflSeason));
   const seg = Seg([["all", "Todas"], ...Object.entries(SEASON_ES2)], S.gflSeason, "act").replace(/data-act="([^"]+)"/g, 'data-act="gfls:$1"');
-  const demand = gFarm() && has("activity") ? flowerPlan().demand : [];
-  return `<div class="toolbar" style="padding:8px 12px;gap:8px;flex-wrap:wrap">${view}${seg}<span class="ctx">${d.seeds.length} semillas · ${d.total} flores${d.hasRecipes ? "" : " · sin recetas de sfl.world: solo semillas"}</span></div>
-    ${demand.length ? `<div class="grp">Te las piden ahora</div><div class="tbl-wrap"><table class="tbl"><tbody>${demand.slice(0, 8).map((x) => `<tr><td class="w">${Gi(x.flower, 14)} ${esc(x.flower)}</td><td class="ctx">${esc(FLOWER_KIND[x.kind] || x.kind)} · ${esc(x.who)}</td><td class="r">${fmt(x.need, 0)}</td><td class="r ${x.have >= x.need ? "up" : "dim"}">tienes ${fmt(x.have, 0)}</td></tr>`).join("")}</tbody></table></div><div class="mod-f"><span>Plan completo en Estrategia → Flores</span><a href="#strategy" class="ctx">Estrategia →</a></div>` : ""}
-    ${list.map((s) => `<div class="grp">${Gi(s.seed, 16)} ${esc(s.seed)} <span class="ctx">· ${s.price != null ? `${fmt(s.price, 0)} coins` : "—"} · ${fmt(s.days, s.days % 1 ? 1 : 0)} ${s.days === 1 ? "día" : "días"} · ${s.seasons.length && s.seasons.length < 4 ? s.seasons.map((x) => SEASON_ES2[x]).join(", ") : "todo el año"}${s.have ? ` · tienes ${fmt(s.have, 0)}` : ""}</span></div>
-      <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Flor</th><th>Cruces posibles</th><th class="r">Coste</th><th class="r">Días</th><th class="r">Tienes</th></tr></thead><tbody>
-      ${s.flowers.map((f) => `<tr><td class="w">${Gi(f.name, 16)} ${esc(f.name)}</td>
-        <td class="ctx wrap">${f.opts.map((o) => `<span class="${f.best?.ing === o.ing ? "tag green" : ""}" style="margin-right:6px">${Gi(o.ing, 12)} ${esc(o.ing)} ×${o.amt}</span>`).join("") || "—"}</td>
-        <td class="r mono">${f.cost == null ? "—" : fmt(f.cost, 3)}</td><td class="r mono dim">${f.days == null ? "—" : fmt(f.days, f.days % 1 ? 1 : 0)}</td>
-        <td class="r mono ${f.have ? "" : "dim"}">${gFarm() ? fmt(f.have, 0) : "—"}</td></tr>`).join("")}
-      </tbody></table></div>`).join("")}
-    <div class="mod-f"><span>Coste = semilla + el cruce más barato a precio de mercado; si el cruce es otra flor, lo que cuesta cultivarla (en verde)</span><span>Días = cultivarla y, si hace falta, la flor del cruce · sin boosts</span></div>`;
+  const demand = farm && has("activity") ? flowerPlan().demand : [];
+  const wanted = new Set(demand.map((x) => x.flower));
+  // Cruces que puedes plantar ya: semilla + lo que pide el cruce
+  const withCan = (s, f) => {
+    const opts = f.opts.map((o) => ({ ...o, can: farm ? Math.min(haveOf(s.seed), Math.floor(haveOf(o.ing) / o.amt)) : null }));
+    return { ...f, opts, can: farm ? Math.max(0, ...opts.map((o) => o.can || 0)) : null };
+  };
+  const cross = (s, f) => `<div class="cb-ing">${f.opts.map((o) => `<div class="${f.best?.ing === o.ing ? "best" : ""}" title="${farm ? `tienes ${fmt(haveOf(o.ing), 0)}` : ""}">${Gi(o.ing, 22)}<span>${esc(o.ing)}${f.best?.ing === o.ing ? ` <em class="tag green">más barato</em>` : ""}</span><b class="${o.can == null ? "" : o.can ? "up" : "down"}">×${fmt(o.amt, 0)}</b></div>`).join("")
+    || `<div class="ctx">${d.hasRecipes ? "Solo sale de la semilla (sin cruce conocido)" : "Cargando cruces de sfl.world…"}</div>`}</div>`;
+  return `<div class="toolbar" style="padding:8px 12px;gap:8px;flex-wrap:wrap">${view}${seg}<span class="ctx">${d.seeds.length} semillas · ${d.total} flores${d.hasRecipes ? "" : " · cargando los cruces de sfl.world"}</span></div>
+    ${demand.length ? `<div class="grp">Te las piden ahora</div><div class="cb-cards">${demand.slice(0, 8).map((x) => ItemCard({ name: x.flower, can: x.have >= x.need ? 1 : 0, sub: `${esc(FLOWER_KIND[x.kind] || x.kind)} · ${esc(x.who)}`,
+        body: `<div class="ctx">Piden ${fmt(x.need, 0)} · tienes <b class="${x.have >= x.need ? "up" : "down"}">${fmt(x.have, 0)}</b></div>` })).join("")}</div>
+      <div class="mod-f"><span>Plan completo en Estrategia → Flores</span><a href="#strategy" class="ctx">Estrategia →</a></div>` : ""}
+    ${list.map((s) => `<div class="grp">${Gi(s.seed, 18)} ${esc(s.seed)} <span class="ctx">· ${s.price != null ? `${fmt(s.price, 0)} coins` : "—"} · ${fmt(s.days, s.days % 1 ? 1 : 0)} ${s.days === 1 ? "día" : "días"} · ${s.seasons.length && s.seasons.length < 4 ? s.seasons.map((x) => SEASON_ES2[x]).join(", ") : "todo el año"}${farm ? ` · tienes ${fmt(s.have, 0)} semilla${s.have === 1 ? "" : "s"}` : ""}</span></div>
+      <div class="cb-cards">${s.flowers.map((f) => withCan(s, f)).sort((a, b) => canFirst(a, b) || Number(wanted.has(b.name)) - Number(wanted.has(a.name)) || (a.cost ?? 1e9) - (b.cost ?? 1e9)).map((f) => ItemCard({
+        name: f.name, can: f.can,
+        tags: `${f.have ? `<span class="tag">tienes ${fmt(f.have, 0)}</span>` : ""}${wanted.has(f.name) ? `<span class="tag sun">te la piden</span>` : ""}`,
+        sub: `${esc(s.seed)} + uno de estos cruces`,
+        body: cross(s, f),
+        stats: [["Coste", f.cost == null ? "—" : fmt(f.cost, 3)], ["Días", f.days == null ? "—" : fmt(f.days, f.days % 1 ? 1 : 0)], ["Puedes plantar", f.can == null ? "—" : `${f.can}×`, f.can ? "up" : "dim"]],
+      })).join("")}</div>`).join("")}
+    <div class="mod-f"><span>Primero las que puedes plantar ya (semilla + cruce) · coste = semilla + el cruce más barato a precio de mercado; si el cruce es otra flor, lo que cuesta cultivarla · en verde los cruces que te llegan</span><span>Días = cultivarla y, si hace falta, la flor del cruce · sin boosts · cruces de sfl.world</span></div>`;
 }
 ACTIONS.gflv = (v) => { S.gflView = v; writeLS("gflView", v); rerun(); };
 ACTIONS.gfls = (v) => { S.gflSeason = v; writeLS("gflSeason", v); rerun(); };

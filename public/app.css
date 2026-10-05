@@ -1231,3 +1231,5 @@ button.xland:hover { border-color: var(--sun); }
 .ly-pal button:hover { border-color: var(--sun); }
 .ly-pal em { font-style: normal; font: 600 12px var(--mono); color: var(--muted); }
 @media (max-width: 1080px) { .ly-wrap { grid-template-columns: 1fr; } .ly-side { border-left: 0; border-top: 1px solid var(--line); max-height: none; } }
+.cb-ing div.best span { color: var(--text); }
+.cb-ing em.tag { font-style: normal; margin-left: 4px; }
