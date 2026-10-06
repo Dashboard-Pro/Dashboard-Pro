@@ -1074,6 +1074,7 @@ a.sr { color: inherit; text-decoration: none; }
 .cb-ing div { display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: center; font-size: 13px; }
 .cb-ing span { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cb-ing b { font: 600 14px var(--mono); }
+.cb-ing div.faint, .cb-ing div.ctx { display: block; font-size: 12px; white-space: normal; }
 .cb-stats { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line); margin-top: auto; }
 .cb-stats div { padding: 8px 10px; border-right: 1px solid var(--line); display: flex; flex-direction: column; gap: 2px; }
 .cb-stats div:last-child { border-right: 0; }
@@ -1207,6 +1208,8 @@ button.xland:hover { border-color: var(--sun); }
 .cb-side div.on { color: var(--text); }
 .cb-side b { font: 600 12px var(--mono); }
 .cb-head .ctx { white-space: normal; margin-top: 2px; }
+/* Sprites (moneda, etc.) dentro de texto de las tarjetas: en línea, no en bloque */
+.cb-card .ctx .spr, .cb-card .tag .spr { display: inline-block; vertical-align: -2px; }
 
 /* ── Simulador de distribución ── */
 .ly-wrap { display: grid; grid-template-columns: minmax(0, 1fr) 300px; border-bottom: 1px solid var(--line); }
