@@ -500,10 +500,43 @@ const itemChip = (l) => `<span class="need ${l.miss ? "miss" : "ok"}" title="${e
 // Fila de lo que piden con lo que tienes (verde si te llega)
 const needRow = (l) => `<div title="${esc(l.name)} · tienes ${fmt(l.have)}${l.unit != null ? ` · ${fmt(l.unit)} FLOWER/u (${l.src})` : " · sin precio"}">${Gi(l.name === "coins" ? "Coins" : l.name, 22, l.name === "coins" ? "coin" : "")}<span>${esc(l.name === "coins" ? "Coins" : l.name === "sfl" ? "FLOWER" : l.name)}</span><b class="${l.miss ? "down" : "up"}">${compact(Math.min(l.have, l.qty))}/${compact(l.qty)}</b></div>`;
 
+// Entregar, saltar o vender: entregar deja la recompensa (tickets al valor del ticket en la tienda de Stella) menos lo que
+// valen los items (lo que sacarías vendiéndolos o lo que cuesta comprar lo que falta); no entregar = quedarte los items
+// (0); saltar es gratis desde el día siguiente a que llegó el pedido (skipOrder.ts) y trae otro del mismo NPC, que de
+// media deja lo que sus pedidos posibles (sfl.world) en recompensa menos coste.
+function deliveryAdvice(o) {
+  if (o.done) return null;
+  let tkv = null;
+  try { tkv = typeof chapterModel === "function" ? chapterModel()?.tkValue?.v ?? null : null; } catch { tkv = null; }
+  const reward = o.kind === "tickets" ? (tkv != null ? o.tickets * tkv : null) : o.rewardValue;
+  // Lo que no tiene precio pero ya tienes (gusanos, pescado envejecido, tesoros…) se cuenta como 0: no hay que comprarlo
+  const missUnknown = o.lines.filter((l) => l.unit == null && l.miss > 0), freeUnknown = o.lines.filter((l) => l.unit == null && !l.miss).map((l) => l.name);
+  const known = !missUnknown.length && reward != null;
+  const profit = known ? reward - o.net : null;
+  const note = freeUnknown.length ? ` · sin contar ${freeUnknown.join(", ")} (lo tienes, sin precio)` : "";
+  // Lo que deja de media un pedido nuevo de ese NPC (con tus mismos boosts de recompensa)
+  let next = null;
+  try {
+    const n = typeof npcGuideModel === "function" ? npcGuideModel().npcs.find((x) => x.npc === o.from) : null;
+    const opts = (n?.orders || []).filter((x) => x.c.ok);
+    if (opts.length) {
+      const rv = (x) => (o.kind === "tickets" ? (tkv != null ? o.tickets * tkv : null) : n.kind === "COINS" ? (toNum(x.reward) * (o.boostMul || 1)) / coinRate() : n.kind === "FLOWER" ? toNum(x.reward) * (o.boostMul || 1) : null);
+      const vals = opts.map((x) => (rv(x) == null ? null : rv(x) - x.c.v)).filter((v) => v != null);
+      if (vals.length) next = vals.reduce((s, v) => s + v, 0) / vals.length;
+    }
+  } catch { next = null; }
+  if (profit == null) return { act: "?", label: "sin precio", cls: "", why: o.kind === "tickets" && tkv == null ? "sin valor del ticket en la tienda de Stella" : `te falta${missUnknown.length > 1 ? "n" : ""} ${missUnknown.map((l) => l.name).join(", ")}, sin precio para valorar${missUnknown.length > 1 ? "los" : "lo"}`, profit, next };
+  const skipBetter = next != null && next > Math.max(profit, 0) + 1e-6;
+  if (profit >= 0 && !(skipBetter && o.canSkip)) return { act: "deliver", label: "entregar", cls: "green", why: `deja ${signed(profit, 3)} FLOWER${o.kind === "tickets" ? ` (${o.tickets} tickets a ${fmt(tkv, 4)})` : ""}${note}`, profit, next };
+  if (skipBetter && o.canSkip && !o.waiting) return { act: "skip", label: "saltar", cls: "sun", why: `un pedido nuevo de ${NPC_ES(o.from)} deja de media ${signed(next, 3)} FLOWER frente a ${signed(profit, 3)} de este (saltar es gratis)${note}`, profit, next };
+  if (skipBetter && !o.canSkip) return { act: "wait", label: "saltar mañana", cls: "", why: `hoy no se puede saltar (llegó hoy); uno nuevo deja de media ${signed(next, 3)}`, profit, next };
+  return { act: "sell", label: "no entregar", cls: "red", why: `perderías ${fmt(-profit, 3)} FLOWER: quédate los items o véndelos${note}`, profit, next };
+}
 function wDeliveries() {
   const m = missionModel();
-  const list = (S.showDone ? m.orders : m.open).map((o) => ({ ...o, can: !o.done && !o.waiting && o.ready ? 1 : 0 })).sort((a, b) =>
-    canFirst(a, b) || (a.done - b.done) || (a.kind === "tickets" ? 0 : 1) - (b.kind === "tickets" ? 0 : 1) || (a.perTicket ?? -a.profit ?? 0) - (b.perTicket ?? -b.profit ?? 0));
+  const ACT_ORDER = { deliver: 0, skip: 1, wait: 2, sell: 3, "?": 4 };
+  const list = (S.showDone ? m.orders : m.open).map((o) => { const adv = deliveryAdvice(o); return { ...o, adv, can: !o.done && !o.waiting && o.ready && adv?.act !== "sell" ? 1 : 0 }; }).sort((a, b) =>
+    canFirst(a, b) || (ACT_ORDER[a.adv?.act] ?? 5) - (ACT_ORDER[b.adv?.act] ?? 5) || (a.done - b.done) || (a.kind === "tickets" ? 0 : 1) - (b.kind === "tickets" ? 0 : 1) || (a.perTicket ?? -a.profit ?? 0) - (b.perTicket ?? -b.profit ?? 0));
   setSub("ms-orders", `${m.open.length} abiertos · ${list.filter((o) => o.can).length} entregables ya`);
   if (!list.length) return Empty("scroll", "Sin pedidos", "No tienes entregas pendientes.");
   const perTickets = m.ticketOrders.map((o) => o.perTicket).filter((x) => x != null).sort((a, b) => a - b);
@@ -515,13 +548,13 @@ function wDeliveries() {
     const verdict = o.kind === "tickets" ? ["Coste/ticket", o.perTicket == null ? "—" : fmt(o.perTicket, 3), o.perTicket != null && o.perTicket <= median ? "up" : "down"]
       : ["Balance", o.profit == null ? "—" : `${o.profit >= 0 ? "+" : ""}${fmt(o.profit, 2)}`, o.profit == null ? "" : o.profit >= 0 ? "up" : "down"];
     return ItemCard({ name: NPC_ES(o.from), icon: o.lines[0]?.name, can: o.can, iconHtml: npcFace(o.from),
-      tags: `${state}${o.canSkip && !o.done ? `<span class="tag">se puede saltar</span>` : ""}`,
-      sub: `Da <b>${reward}</b>${o.boosts?.length ? ` · con ${o.boosts.map((b) => b.name).join(", ")}` : ""}${o.kind !== "tickets" && o.profit != null ? ` · ${o.profit >= 0 ? "conviene entregar" : "conviene vender"}` : ""}`,
+      tags: `${o.adv ? `<span class="tag ${o.adv.cls}">${esc(o.adv.label)}</span>` : ""}${state}`,
+      sub: `Da <b>${reward}</b>${o.boosts?.length ? ` · con ${o.boosts.map((b) => b.name).join(", ")}` : ""}${o.adv ? `<div class="ctx">${esc(o.adv.label[0].toUpperCase() + o.adv.label.slice(1))}: ${o.adv.why}</div>` : ""}`,
       body: `<div class="cb-ing">${o.lines.map(needRow).join("")}${o.unknown.length ? `<div class="faint">${o.unknown.length} sin precio</div>` : ""}</div>`,
-      stats: [["Valor pedido", fmt(o.net, 2)], verdict, ["Falta comprar", o.missingCost ? fmt(o.missingCost, 2) : "—", o.missingCost ? "down" : "up"]],
+      stats: [["Valor pedido", fmt(o.net, 2)], verdict, ["Si entregas", o.adv?.profit == null ? "—" : signed(o.adv.profit, 3), o.adv?.profit == null ? "" : tone(o.adv.profit)], ["Uno nuevo", o.adv?.next == null ? "—" : signed(o.adv.next, 3), o.adv?.next == null ? "" : tone(o.adv.next)]],
     });
   }).join("")}</div>
-    <div class="mod-f"><span>Primero lo que puedes entregar ya · valor = lo que ganarías vendiendo esos items${S.p2pTax ? ` (${taxNote()})` : ""}; herramientas y comidas por receta; coins a ${fmt(coinRate(), 0)}/FLOWER · la recompensa lleva tus boosts y la entrega doble</span>
+    <div class="mod-f"><span>Primero lo que conviene hacer ya · entregar = recompensa (tickets al valor del ticket en la tienda de Stella) − lo que valen los items; saltar es gratis desde el día siguiente y trae otro pedido del mismo NPC ("Uno nuevo" = lo que deja de media, con los pedidos de sfl.world) · valor = lo que ganarías vendiendo esos items${S.p2pTax ? ` (${taxNote()})` : ""}; herramientas y comidas por receta; coins a ${fmt(coinRate(), 0)}/FLOWER · la recompensa lleva tus boosts y la entrega doble</span>
       <span>coste/ticket en verde = por debajo de la mediana (${fmt(median, 3)})</span></div>`;
 }
 

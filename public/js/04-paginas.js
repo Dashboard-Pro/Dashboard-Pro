@@ -119,7 +119,7 @@ const PAGES = {
     mount("ms-tabs", { deps: ["farm", "activity"], render: missionTabs, loading: "block" });
     // Se repinta al llegar los precios: el valor automático de las coins sale de ellos
     mount("ms-settings", { deps: ["farm", "activity"], soft: ["fx"], render: missionSettings, loading: "block" });
-    mount(t.id, { deps: ["farm", "activity"], soft: ["fx"], render: t.render, loading: "rows" });
+    mount(t.id, { deps: ["farm", "activity"], soft: ["fx", "npcDeliveries"], render: t.render, loading: "rows" });
   },
 
   skills() {
