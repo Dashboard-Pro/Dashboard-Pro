@@ -228,23 +228,26 @@ function wFactionKitchen() {
   setSub("fc-kitchen", `entregas de hoy: cada una vale 2 puntos menos que la anterior (mínimo 1)`);
   if (!f.kitchen.length) return Empty("cook", "Sin pedidos", "La cocina no tiene pedidos esta semana.");
   const best = f.kitchen.filter((k) => k.perFlower).sort((a, b) => b.perFlower - a.perFlower)[0];
-  return `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Pide</th><th class="r">Cantidad</th><th class="r">Tienes</th><th class="r">Hoy</th><th class="r">Marks siguiente</th><th class="r">Coste</th><th class="r">Marks/FLW</th></tr></thead><tbody>
-    ${f.kitchen.map((k) => `<tr><td class="w">${Gi(k.item, 14)} ${esc(k.item)}${k === best ? ` <span class="tag green">el más rentable</span>` : ""}</td><td class="r">${fmt(k.amount, 0)}</td>
-      <td class="r ${k.have >= k.amount ? "up" : "down"}">${compact(k.have)}</td><td class="r dim">${k.done}×</td>
-      <td class="r"><b>${fmt(k.total, 1)}</b>${f.boost ? `<div class="ctx">${k.pts} + rango</div>` : ""}</td>
-      <td class="r dim">${k.cost != null ? `${fmt(k.cost, 3)} FLW` : "—"}</td><td class="r">${k.perFlower != null ? fmt(k.perFlower, 0) : "—"}</td></tr>`).join("")}
-  </tbody></table></div><div class="mod-f"><span>Marks siguiente = lo que da tu próxima entrega de hoy (base 20)</span><span>coste = floor del mercado</span></div>`;
+  // Primero lo que puedes entregar ya (tienes la cantidad), y entre ello lo que más marks da por FLOWER
+  const rows = f.kitchen.map((k) => ({ ...k, can: k.have >= k.amount ? Math.floor(k.have / k.amount) : 0 })).sort((a, b) => canFirst(a, b) || (b.perFlower ?? 0) - (a.perFlower ?? 0));
+  return `<div class="cb-cards">${rows.map((k) => ItemCard({ name: k.item, can: k.can,
+    tags: `${k === best || k.item === best?.item ? `<span class="tag green">el más rentable</span>` : ""}<span class="tag">hoy ${k.done}×</span>`,
+    sub: `la próxima entrega de hoy da <b>${fmt(k.total, 1)} marks</b>${f.boost ? ` (${k.pts} + rango)` : ""}`,
+    body: `<div class="cb-ing"><div>${Gi(k.item, 22)}<span>${esc(k.item)}</span><b class="${k.have >= k.amount ? "up" : "down"}">${compact(Math.min(k.have, k.amount))}/${fmt(k.amount, 0)}</b></div></div>`,
+    stats: [["Coste", k.cost != null ? fmt(k.cost, 3) : "—"], ["Marks/FLW", k.perFlower != null ? fmt(k.perFlower, 0) : "—"], ["Puedes entregar", k.can ? `${k.can}×` : "—", k.can ? "up" : "dim"]],
+  })).join("")}</div><div class="mod-f"><span>Primero lo que puedes entregar ya · marks = lo que da tu próxima entrega de hoy (base 20)</span><span>coste = floor del mercado</span></div>`;
 }
 function wFactionPetReq() {
   const f = factionModel();
   if (!f) return "";
   setSub("fc-petreq", "suma XP a la mascota colectiva y te da marks");
   if (!f.petReq.length) return Empty("cook", "Sin peticiones", "La mascota de la facción no pide nada esta semana.");
-  return `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Comida</th><th class="r">Cantidad</th><th class="r">Tienes</th><th class="r">Hoy</th><th class="r">Marks siguiente</th><th class="r">XP mascota</th></tr></thead><tbody>
-    ${f.petReq.map((q) => `<tr><td class="w">${Gi(q.food, 14)} ${esc(q.food)}</td><td class="r">${fmt(q.quantity, 0)}</td>
-      <td class="r ${q.have >= q.quantity ? "up" : "down"}">${compact(q.have)}</td><td class="r dim">${q.done}×</td>
-      <td class="r"><b>${fmt(q.total, 1)}</b></td><td class="r dim">${compact(q.xp)}</td></tr>`).join("")}
-  </tbody></table></div><div class="mod-f"><span>Base 4 / 8 / 12 / 20 marks según dificultad, 2 menos por cada entrega del día</span><span></span></div>`;
+  const rows = f.petReq.map((q) => ({ ...q, can: q.have >= q.quantity ? Math.floor(q.have / q.quantity) : 0 })).sort((a, b) => canFirst(a, b) || b.total - a.total);
+  return `<div class="cb-cards">${rows.map((q) => ItemCard({ name: q.food, can: q.can, tags: `<span class="tag">hoy ${q.done}×</span>`,
+    sub: `la próxima entrega de hoy da <b>${fmt(q.total, 1)} marks</b> · +${compact(q.xp)} XP a la mascota`,
+    body: `<div class="cb-ing"><div>${Gi(q.food, 22)}<span>${esc(q.food)}</span><b class="${q.have >= q.quantity ? "up" : "down"}">${compact(Math.min(q.have, q.quantity))}/${fmt(q.quantity, 0)}</b></div></div>`,
+    stats: [["Marks", fmt(q.total, 1)], ["XP mascota", compact(q.xp)], ["Puedes entregar", q.can ? `${q.can}×` : "—", q.can ? "up" : "dim"]],
+  })).join("")}</div><div class="mod-f"><span>Primero lo que puedes entregar ya · base 4 / 8 / 12 / 20 marks según dificultad, 2 menos por cada entrega del día</span><span></span></div>`;
 }
 function wFactionPet() {
   const f = factionModel();
@@ -300,15 +303,17 @@ const FC_SHOP_TYPES = [["all", "Todo"], ["wearable", "Ropa"], ["collectible", "C
 function wFactionShop() {
   const d = factionShopModel();
   if (!d) return "";
-  const list = d.rows.filter((r) => S.fcShop === "all" || r.type === S.fcShop).sort((a, b) => a.done - b.done || a.price - b.price);
+  // Primero lo que puedes comprar ya (marks suficientes y sin candado), luego lo que no tienes por precio
+  const list = d.rows.filter((r) => S.fcShop === "all" || r.type === S.fcShop).map((r) => ({ ...r, can: !r.done && r.miss === 0 && !r.locked ? 1 : 0 }))
+    .sort((a, b) => canFirst(a, b) || a.done - b.done || a.price - b.price);
   setSub("fc-shop", `${fmt(d.f.marks, 0)} marks · ${d.perDay ? `ganas ≈ ${fmt(d.perDay * 7, 0)} por semana` : "sin semanas cerradas para medir tu ritmo"}`);
-  return `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Objeto</th><th class="r">Marks</th><th class="r">Te faltan</th><th class="r">Días</th><th class="r">Mercado</th><th class="r">Marks/FLW</th></tr></thead><tbody>
-    ${list.map((r) => `<tr class="${r.done ? "dim" : ""}"><td class="w">${Gi(r.name, 16)} ${esc(r.name)}${r.done ? ` <span class="tag green">lo tienes</span>` : r.repeat && r.owned ? ` <span class="tag">tienes ${compact(r.owned)}</span>` : ""}${r.done ? "" : r.miss === 0 && !r.locked ? ` <span class="tag sun">puedes comprarlo</span>` : ""}${r.locked ? ` <span class="tag" title="Necesitas ${esc(r.requires)}">🔒 ${esc(r.requires)}</span>` : ""}</td>
-      <td class="r">${fmt(r.price, 0)}</td><td class="r ${r.miss ? "down" : "up"}">${r.done ? "—" : r.miss ? fmt(r.miss, 0) : "✓"}</td>
-      <td class="r dim">${r.days && !r.done ? fmt(r.days, 0) : "—"}</td><td class="r dim">${r.market ? `${fmt(r.market, 2)} FLW` : "—"}</td>
-      <td class="r">${r.market ? fmt(r.price / r.market, 0) : "—"}</td></tr>`).join("")}
-  </tbody></table></div>
-  <div class="mod-f"><span>Días = marks que faltan ÷ tu media de las ${d.weeks} últimas semanas (puntos + premio)</span><span>Marks/FLW: cuántos marks cuesta cada FLOWER de valor en el mercado (menos = mejor compra)</span></div>`;
+  return `<div class="cb-cards">${list.map((r) => ItemCard({ name: r.name, can: r.can,
+    tags: `${r.done ? `<span class="tag green">lo tienes</span>` : r.repeat && r.owned ? `<span class="tag">tienes ${compact(r.owned)}</span>` : ""}${r.locked ? `<span class="tag" title="Necesitas ${esc(r.requires)}">🔒 ${esc(r.requires)}</span>` : ""}`,
+    sub: esc([].concat(G.buffs?.[r.name] || []).join(" · ")) || esc(r.type || ""),
+    body: `<div class="cb-ing"><div>${Gi("Mark", 22)}<span>Marks</span><b class="${d.f.marks >= r.price ? "up" : "down"}">${fmt(r.price, 0)}</b></div></div>`,
+    stats: [["Te faltan", r.done ? "—" : r.miss ? fmt(r.miss, 0) : "✓", r.miss ? "down" : "up"], ["Días", r.days && !r.done ? fmt(r.days, 0) : "—"], ["Mercado", r.market ? fmt(r.market, 2) : "—"], ["Marks/FLW", r.market ? fmt(r.price / r.market, 0) : "—"]],
+  })).join("")}</div>
+  <div class="mod-f"><span>Primero lo que puedes comprar ya · días = marks que faltan ÷ tu media de las ${d.weeks} últimas semanas (puntos + premio)</span><span>Marks/FLW: cuántos marks cuesta cada FLOWER de valor en el mercado (menos = mejor compra)</span></div>`;
 }
 
 /* ── Amigos: sus granjas (del volcado nocturno) comparadas con la tuya ──── */

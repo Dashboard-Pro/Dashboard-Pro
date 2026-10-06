@@ -186,16 +186,16 @@ function wSkillRanks() {
   const head = !now_ ? `<div class="ctx" style="padding:10px 16px">${m.free <= 0 && m.shards > 0
     ? `Tienes ${m.shards} Ascension Shard${m.shards === 1 ? "" : "s"}, pero subir de rango también gasta puntos de skill y no te queda ninguno libre: con cada nivel del Bumpkin ganas 1 (las de tier 1 piden 1 punto y 1 shard). Abajo, en qué gastarlos primero.`
     : !m.shards ? "Te faltan Ascension Shards: se sacan picando el Ascension Crystal." : "Te faltan puntos de skill o el tier del árbol para las que quedan."}</div>` : "";
-  return `${head}<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Skill</th><th>Árbol</th><th class="r">Rango</th><th class="r">Coste</th>
-    <th class="r" data-tip="Ganancia|FLOWER al día que suma subirla un rango, sobre lo que produces hoy (mismo cálculo que el Simulador). Solo para skills con efecto en Producción|" tabindex="0">FLOWER/día</th><th>Estado</th></tr></thead><tbody>
-    ${list.map((s) => `<tr><td><b>${esc(s.name)}</b><div class="ctx" title="${esc(s.buff)}">${esc(s.buff)}</div></td>
-      <td>${esc(TREES[s.treeName]?.label || s.treeName)} <span class="dim">· T${s.tier}</span></td>
-      <td class="r mono">${s.rank} → ${s.up.rank}<div class="ctx">de ${s.maxRank}</div></td>
-      <td class="r mono">${Gi("Ascension Shard", 14)} ${s.up.shards} · ${s.up.points} pt${s.up.points > 1 ? "s" : ""}</td>
-      <td class="r mono ${s.gain == null ? "" : tone(s.gain)}">${s.gain == null ? `<span class="dim">—</span>` : signed(s.gain, 3)}</td>
-      <td>${s.canUp ? `<span class="st-tag avail">Puedes subirla ya</span>` : `<span class="ctx">${esc(s.upReason)}</span>`}</td></tr>`).join("")}
-  </tbody></table></div>
-  <div class="mod-f"><span>Coste por rango: tantos shards como su tier y 1/3/6 puntos de skill (tier 1/2/3) · el rango 2 de una de tier 1 pide tier 2 en el árbol y el 3, tier 3</span><span>bumpkinSkills.ts del juego</span></div>`;
+  return `${head}<div class="cb-cards">${list.map((x) => ({ ...x, can: x.canUp ? 1 : 0 })).map((x) => ItemCard({ name: x.name, iconHtml: `<span class="lv-badge">R${x.rank}</span>`, can: x.can,
+      tags: `<span class="tag">${esc(TREES[x.treeName]?.label || x.treeName)} · T${x.tier}</span>${x.canUp ? `<span class="tag green">puedes subirla ya</span>` : ""}`,
+      sub: esc(x.buff),
+      body: `<div class="cb-ing">
+        <div>${Gi("Ascension Shard", 22)}<span>Ascension Shards</span><b class="${m.shards >= x.up.shards ? "up" : "down"}">×${x.up.shards}</b></div>
+        <div><span class="lv-badge" style="width:22px;height:22px;font-size:10px">pt</span><span>Puntos de skill</span><b class="${m.free >= x.up.points ? "up" : "down"}">×${x.up.points}</b></div>
+        ${x.upReason ? `<div class="ctx">${esc(x.upReason)}</div>` : ""}</div>`,
+      stats: [["Rango", `${x.rank} → ${x.up.rank} de ${x.maxRank}`], ["FLOWER/día", x.gain == null ? "—" : signed(x.gain, 3), x.gain == null ? "" : tone(x.gain)]],
+    })).join("")}</div>
+  <div class="mod-f"><span>Primero las que puedes subir ya, luego las que más suman · coste por rango: tantos shards como su tier y 1/3/6 puntos de skill (tier 1/2/3) · el rango 2 de una de tier 1 pide tier 2 en el árbol y el 3, tier 3</span><span>bumpkinSkills.ts del juego</span></div>`;
 }
 
 // Shards y reinicio: cristales por picar (3 shards cada uno con un Gold Pickaxe, mineAscensionCrystal.ts) y cuándo puedes

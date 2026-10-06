@@ -111,21 +111,22 @@ function wChShop() {
   const d = chapterModel();
   if (!d) return "";
   if (!d.shop.length) return Empty("chest", "Sin tienda", "El juego no trae tienda para este capítulo.");
-  const rows = d.shop.slice().sort((a, b) => (a.soldOut - b.soldOut) || (b.goal - a.goal) || (a.tk || 1e9) - (b.tk || 1e9));
-  setSub("ch-shop", `${d.shop.filter((s) => s.bought).length} comprados · marca ★ lo que quieres y te dice cuánto falta`);
-  return `<div class="tbl-wrap"><table class="tbl"><thead><tr><th></th><th>Objeto</th><th class="r">Precio</th><th class="r">Comprado</th><th class="r">Te faltan</th><th class="r">Días</th><th class="r">Mercado</th></tr></thead><tbody>
-    ${rows.map((it) => `<tr class="${it.soldOut ? "dim" : ""}">
-      <td><button class="star${it.goal ? " on" : ""}" data-act="chgoal:${esc(it.name)}" title="Meta">${sprite("star", 12)}</button></td>
-      <td class="w">${Gi(it.name, 16)} ${esc(it.name)}${it.canBuy ? ` <span class="tag green">puedes comprarlo</span>` : ""}${it.soldOut ? ` <span class="tag">agotado</span>` : ""}</td>
-      <td class="r">${esc(costTxt(it.parts))}</td>
-      <td class="r dim">${it.bought}${it.limit != null ? ` / ${it.limit}` : ""}</td>
-      <td class="r ${it.missTk ? "down" : "up"}">${it.tk ? (it.missTk ? fmt(it.missTk, 0) : "✓") : "—"}</td>
-      <td class="r dim">${it.days ? fmt(it.days, 0) : "—"}</td>
-      <td class="r dim">${it.market.v && it.market.src === "mercado" ? `${fmt(it.market.v, 2)} FLW` : "—"}</td></tr>`).join("")}
-  </tbody></table></div>
-  <div class="mod-f"><span>Días = tickets que faltan ÷ tu ritmo (${d.pace != null ? fmt(d.pace, 1) : "—"}/día)</span><span>${d.tkValue ? `1 ${esc(d.ticket)} ≈ ${fmt(d.tkValue.v, 4)} FLOWER (${esc(d.tkValue.name)})` : ""}</span></div>`;
+  // Primero lo que puedes comprar ya, luego tus metas ★ y lo más barato
+  const rows = d.shop.map((it) => ({ ...it, can: it.canBuy ? 1 : 0 })).sort((a, b) => canFirst(a, b) || (a.soldOut - b.soldOut) || (b.goal - a.goal) || (a.tk || 1e9) - (b.tk || 1e9));
+  setSub("ch-shop", `${d.shop.filter((x) => x.canBuy).length} puedes comprar ya · ${d.shop.filter((x) => x.bought).length} comprados · marca ★ lo que quieres`);
+  const costRow = (p) => {
+    const isTk = p.name === d.ticket, have = isTk ? d.have ?? 0 : p.name === "coins" ? toNum(store.farm.data.farm.coins) : p.name === "sfl" ? toNum(store.farm.data.farm.balance) : haveOf(p.name);
+    const label = p.name === "sfl" ? "FLOWER" : p.name === "coins" ? "Coins" : p.name;
+    return `<div title="tienes ${fmt(have, 0)}">${Gi(p.name === "coins" ? "Coins" : p.name === "sfl" ? "FLOWER" : p.name, 22, p.name === "coins" ? "coin" : "")}<span>${esc(label)}</span><b class="${have >= p.qty ? "up" : "down"}">${compact(p.qty)}</b></div>`;
+  };
+  return `<div class="cb-cards">${rows.map((it) => ItemCard({ name: it.name, can: it.can,
+    tags: `<button class="star${it.goal ? " on" : ""}" data-act="chgoal:${esc(it.name)}" title="Meta">${sprite("star", 12)}</button>${it.soldOut ? `<span class="tag">agotado</span>` : ""}${it.owned ? `<span class="tag">tienes ${fmt(it.owned, 0)}</span>` : ""}`,
+    sub: esc([].concat(G.buffs?.[it.name] || []).join(" · ")) || (it.limit != null ? `límite ${it.limit}` : ""),
+    body: `<div class="cb-ing">${it.parts.map(costRow).join("") || `<div class="ctx">gratis</div>`}</div>`,
+    stats: [["Comprado", `${it.bought}${it.limit != null ? ` / ${it.limit}` : ""}`], ["Te faltan", it.tk ? (it.missTk ? fmt(it.missTk, 0) : "✓") : "—", it.missTk ? "down" : "up"], ["Días", it.days ? fmt(it.days, 0) : "—"], ["Mercado", it.market.v && it.market.src === "mercado" ? fmt(it.market.v, 2) : "—"]],
+  })).join("")}</div>
+  <div class="mod-f"><span>Primero lo que puedes comprar ya · días = tickets que faltan ÷ tu ritmo (${d.pace != null ? fmt(d.pace, 1) : "—"}/día)</span><span>${d.tkValue ? `1 ${esc(d.ticket)} ≈ ${fmt(d.tkValue.v, 4)} FLOWER (${esc(d.tkValue.name)})` : ""}</span></div>`;
 }
-
 function wChGoals() {
   const d = chapterModel();
   if (!d) return "";
@@ -187,34 +188,30 @@ function wChChores() {
   const done = d.chores.filter((c) => c.done), left = d.chores.filter((c) => !c.done);
   setSub("ch-chores", `${done.length}/${d.chores.length} · quedan ${fmt(left.reduce((s, c) => s + c.tickets, 0), 0)} ${d.ticket}`);
   if (!d.chores.length) return Empty("check", "Sin tareas", "El tablón de tareas está vacío.");
-  const rows = [...left.sort((a, b) => (b.p ?? 0) - (a.p ?? 0)), ...done];
-  return `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>NPC</th><th>Tarea</th><th class="r">Progreso</th><th class="r">Tickets</th></tr></thead><tbody>
-    ${rows.map((c) => `<tr class="${c.done ? "dim" : ""}"><td class="w">${esc(c.npc)}</td><td>${esc(c.name)}</td>
-      <td class="r">${c.done ? `<span class="tag green">hecha</span>` : c.def ? `${fmt(c.progress, 0)} / ${fmt(c.def.amount, 0)}` : "—"}</td>
-      <td class="r"><b>${fmt(c.tickets, 0)}</b></td></tr>`).join("")}
-  </tbody></table></div>`;
+  const rows = d.chores.map((c) => ({ ...c, can: !c.done && c.p >= 1 ? 1 : 0 })).sort((a, b) => canFirst(a, b) || (a.done - b.done) || (b.p ?? 0) - (a.p ?? 0));
+  return `<div class="cb-cards">${rows.map((c) => ItemCard({ name: c.name, icon: d.ticket, can: c.can, iconHtml: npcFace(c.npc),
+    tags: c.done ? `<span class="tag">hecha</span>` : c.can ? `<span class="tag green">lista para reclamar</span>` : "",
+    sub: `${esc(NPC_ES(c.npc))} · da <b>${c.tickets ? `${fmt(c.tickets, 0)} ${esc(d.ticket)}` : chReward(c.reward)}</b>`,
+    body: c.def ? `<div class="pbar${c.p >= 1 ? " done" : ""}"><i style="width:${(Math.min(1, c.p || 0) * 100).toFixed(0)}%"></i></div><div class="ctx" style="margin-top:6px">${fmt(Math.min(c.progress, c.def.amount), 0)} / ${fmt(c.def.amount, 0)}</div>` : `<div class="ctx">progreso no disponible</div>`,
+  })).join("")}</div><div class="mod-f"><span>Primero las que ya puedes reclamar, luego las más avanzadas</span><span>+2 VIP y +1 por objeto de boost del capítulo</span></div>`;
 }
-
 function wChDeliveries() {
   const d = chapterModel();
   if (!d) return "";
   const tk = d.m.orders.filter((o) => o.kind === "tickets");
-  const done = tk.filter((o) => o.done).length;
-  setSub("ch-orders", `${done}/${tk.length} hechas · +${d.extra} por VIP y boosts del capítulo`);
+  setSub("ch-orders", `${tk.filter((o) => o.done).length}/${tk.length} hechas · +${d.extra} por VIP y boosts del capítulo`);
   if (!tk.length) return Empty("scroll", "Sin entregas de tickets", "");
-  const v = d.tkValue?.v || null;
-  const rows = tk.slice().sort((a, b) => (a.done - b.done) || (a.perTicket ?? 1e9) - (b.perTicket ?? 1e9));
-  return `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>NPC</th><th>Pide</th><th class="r">Tickets</th><th class="r">Valen los ingredientes</th><th class="r">FLW / ticket</th><th>¿Entregar?</th></tr></thead><tbody>
-    ${rows.map((o) => {
-      const verdict = o.done ? `<span class="tag green">hecha</span>` : v && o.net ? (o.perTicket <= v ? `<span class="tag green">entrega</span>` : `<span class="tag red">vende los ingredientes</span>`) : "";
-      return `<tr class="${o.done ? "dim" : ""}"><td class="w">${esc(o.from)}</td><td>${Object.entries(o.items || {}).map(([k, q]) => `${Gi(k, 14)} ${fmt(q, 0)}`).join(" ")}</td>
-        <td class="r"><b>${fmt(o.tickets, 0)}</b></td><td class="r dim">${o.net ? `${fmt(o.net, 3)} FLW` : "—"}</td>
-        <td class="r">${o.net ? fmt(o.perTicket, 4) : "—"}</td><td>${verdict}</td></tr>`;
-    }).join("")}
-  </tbody></table></div>
-  <div class="mod-f"><span>${v ? `Entrega si el ticket te cuesta menos de lo que vale (${fmt(v, 4)} FLOWER, por ${esc(d.tkValue.name)})` : "Sin precio de mercado para valorar el ticket"}</span><a href="#missions" class="ctx">Misiones →</a></div>`;
+  const ACT = { deliver: 0, skip: 1, wait: 2, sell: 3, "?": 4 };
+  const rows = tk.map((o) => { const adv = deliveryAdvice(o); return { ...o, adv, can: !o.done && !o.waiting && o.ready && adv?.act !== "sell" ? 1 : 0 }; })
+    .sort((a, b) => canFirst(a, b) || (a.done - b.done) || (ACT[a.adv?.act] ?? 5) - (ACT[b.adv?.act] ?? 5) || (a.perTicket ?? 1e9) - (b.perTicket ?? 1e9));
+  return `<div class="cb-cards">${rows.map((o) => ItemCard({ name: NPC_ES(o.from), icon: d.ticket, can: o.can, iconHtml: npcFace(o.from),
+    tags: `${o.done ? `<span class="tag">hecha</span>` : o.adv ? `<span class="tag ${o.adv.cls}">${esc(o.adv.label)}</span>` : ""}${!o.done && o.ready ? `<span class="tag green">entregable</span>` : ""}`,
+    sub: `Da <b>${fmt(o.tickets, 0)} ${esc(d.ticket)}</b>${o.adv && !o.done ? `<div class="ctx">${o.adv.why}</div>` : ""}`,
+    body: `<div class="cb-ing">${o.lines.map(needRow).join("")}</div>`,
+    stats: [["Valen los items", o.net ? fmt(o.net, 3) : "—"], ["FLW / ticket", o.perTicket != null ? fmt(o.perTicket, 4) : "—", d.tkValue && o.perTicket != null ? (o.perTicket <= d.tkValue.v ? "up" : "down") : ""], ["Si entregas", o.adv?.profit == null ? "—" : signed(o.adv.profit, 3), o.adv?.profit == null ? "" : tone(o.adv.profit)]],
+  })).join("")}</div>
+  <div class="mod-f"><span>Primero lo que conviene entregar ya · ${d.tkValue ? `entrega si el ticket te cuesta menos de lo que vale (${fmt(d.tkValue.v, 4)} FLOWER, por ${esc(d.tkValue.name)})` : "sin precio de mercado para valorar el ticket"}</span><a href="#missions" class="ctx">Misiones →</a></div>`;
 }
-
 function bestAnimalLevel(farm, type) {
   const home = type === "Chicken" ? farm.henHouse : farm.barn;
   return Math.max(0, ...Object.values(home?.animals || {}).filter((a) => a.type === type).map((a) => animalLevel(type, toNum(a.experience))));
@@ -228,19 +225,19 @@ function wChBounties() {
   const animal = S.chBounty === "animal";
   const list = all.filter((b) => (b.level != null) === animal);
   const rows = list.map((b) => {
-    if (animal) { const best = bestAnimalLevel(farm, b.name); return { ...b, best, ok: best >= b.level }; }
+    if (animal) { const best = bestAnimalLevel(farm, b.name); return { ...b, best, ok: best >= b.level, can: !b.soldAt && best >= b.level ? 1 : 0 }; }
     const v = price(b.name).v, have = haveOf(b.name);
-    return { ...b, have, v, per: v != null && b.tickets ? v / b.tickets : null, ok: have >= 1 };
-  }).sort((a, b) => (Boolean(a.soldAt) - Boolean(b.soldAt)) || (b.ok - a.ok) || (animal ? b.level - a.level : (a.per ?? 1e9) - (b.per ?? 1e9)));
+    return { ...b, have, v, per: v != null && b.tickets ? v / b.tickets : null, ok: have >= 1, can: !b.soldAt && have >= 1 ? 1 : 0 };
+  }).sort((a, b) => canFirst(a, b) || (Boolean(a.soldAt) - Boolean(b.soldAt)) || (animal ? b.level - a.level : (a.per ?? 1e9) - (b.per ?? 1e9)));
   const rew = (b) => b.tickets ? `${fmt(b.tickets, 0)} ${esc(d.ticket)}` : b.coins ? `${compact(b.coins)} coins` : b.sfl ? `${fmt(b.sfl, 2)} FLW` : "—";
   const tabs = Seg([["animal", "Animales"], ["item", "Objetos"]], S.chBounty, "act").replace(/data-act="(\w+)"/g, 'data-act="chbounty:$1"');
-  return `<div style="padding:8px 12px">${tabs}</div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Pide</th>${animal ? `<th class="r">Nivel</th><th class="r">Tu mejor</th>` : `<th class="r">Tienes</th><th class="r">FLW / ticket</th>`}<th class="r">Premio</th></tr></thead><tbody>
-    ${rows.map((b) => `<tr class="${b.soldAt ? "dim" : ""}"><td class="w">${Gi(b.name, 14)} ${esc(b.name)}${b.soldAt ? ` <span class="tag green">hecho</span>` : ""}</td>
-      ${animal ? `<td class="r">${b.level}</td><td class="r ${b.ok ? "up" : "down"}">${b.best}</td>` : `<td class="r ${b.ok ? "up" : "down"}">${compact(b.have)}</td><td class="r dim">${b.per != null ? fmt(b.per, 4) : "—"}</td>`}
-      <td class="r"><b>${rew(b)}</b></td></tr>`).join("")}
-  </tbody></table></div>`;
+  return `<div style="padding:8px 12px">${tabs}</div><div class="cb-cards">${rows.map((b) => ItemCard({ name: b.name, can: b.can,
+    tags: b.soldAt ? `<span class="tag green">hecho</span>` : b.can ? `<span class="tag green">puedes ya</span>` : "",
+    sub: `da <b>${rew(b)}</b>`,
+    body: animal ? `<div class="ctx">Pide nivel ${b.level} · tu mejor: <b class="${b.ok ? "up" : "down"}">${b.best}</b></div>` : `<div class="ctx">Pide 1 · tienes <b class="${b.ok ? "up" : "down"}">${compact(b.have)}</b></div>`,
+    stats: animal ? [["Nivel", b.level], ["Tu mejor", b.best, b.ok ? "up" : "down"]] : [["Vale", b.v != null ? fmt(b.v, 3) : "—"], ["FLW / ticket", b.per != null ? fmt(b.per, 4) : "—"]],
+  })).join("")}</div>`;
 }
-
 // Proyección hasta el final del capítulo por fuente (como el Chapter Race de sfl-calculator): lo máximo que puedes sacar
 // si haces todo lo que da tickets cada día/semana, y lo que cuesta. Entregas = una por NPC de tickets al día (×2 en los
 // días dobles del calendario); tareas y bounties = las de esta semana repetidas cada semana que queda; cofre = 1 al día.

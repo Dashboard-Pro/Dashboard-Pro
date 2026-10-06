@@ -109,13 +109,17 @@ function invMake() {
     for (const [it, q] of need) { const have = haveOf(it); n = Math.min(n, Math.floor(have / q)); if (have < q) miss.push([it, q - have]); }
     if (coins) { n = Math.min(n, Math.floor(toNum(farm.coins) / coins)); if (toNum(farm.coins) < coins) miss.push(["Coins", coins - toNum(farm.coins)]); }
     if (!need.length && !coins) return null;
-    const cost = price ? need.reduce((s, [it, q]) => s + (price(it).v ?? 0) * q, 0) + coins / coinRate() : null;
-    return { name, n: Number.isFinite(n) ? n : 0, miss, cost };
+    const cost = price ? need.reduce((s2, [it, q]) => s2 + (price(it).v ?? 0) * q, 0) + coins / coinRate() : null;
+    return { name, r, n: Number.isFinite(n) ? n : 0, miss, cost, can: Number.isFinite(n) ? n : 0 };
   }).filter(Boolean);
-  const now_ = rows.filter((r) => r.n > 0).sort((a, b) => b.n - a.n), one = rows.filter((r) => r.n === 0 && r.miss.length === 1).sort((a, b) => a.miss[0][1] - b.miss[0][1]);
+  // Lo que puedes hacer ya primero; luego lo que se queda a un solo ingrediente
+  const list = rows.filter((x) => x.n > 0 || x.miss.length === 1).sort((a2, b2) => canFirst(a2, b2) || b2.n - a2.n || (a2.miss[0]?.[1] ?? 0) - (b2.miss[0]?.[1] ?? 0)).slice(0, 60);
   return `<div class="seg" style="margin-bottom:10px">${[["food", "Cocina"], ["craft", "Fabricación"]].map(([k, l]) => `<button data-act="invmake:${k}" class="${S.invMake === k ? "on" : ""}">${l}</button>`).join("")}</div>
-    <h4 class="acc-h">Puedes hacer ahora</h4>${now_.length ? `<div class="inv-top">${now_.slice(0, 24).map((r) => `<div class="inv-card">${Gi(r.name, 28)}<b>${esc(r.name)}</b><span class="ctx">×${r.n}</span>${r.cost != null ? `<span class="ctx">ingredientes ${fmt(r.cost, 2)} FLW</span>` : ""}</div>`).join("")}</div>` : `<p class="ctx">Nada con lo que tienes ahora mismo.</p>`}
-    <h4 class="acc-h">Te falta un ingrediente</h4>${one.length ? one.slice(0, 40).map((r) => `<div class="bst-row"><span class="nm">${Gi(r.name, 14)} ${esc(r.name)}</span><span class="tag">te falta ${compact(r.miss[0][1])} ${esc(r.miss[0][0])}</span></div>`).join("") : `<p class="ctx">Nada.</p>`}`;
+    ${list.length ? `<div class="cb-cards" style="padding:0">${list.map((x) => ItemCard({ name: x.name, can: x.can,
+      tags: x.n ? `<span class="tag green">puedes ×${x.n}</span>` : `<span class="tag">te falta ${compact(x.miss[0][1])} ${esc(x.miss[0][0])}</span>`,
+      sub: G.foods?.[x.name]?.building ? esc(G.foods[x.name].building) : "",
+      body: IngList(x.r.items || {}, 1, toNum(x.r.coins)),
+      stats: [["Ingredientes", x.cost != null ? fmt(x.cost, 2) : "—"], ["Puedes", x.n ? `${x.n}×` : "no", x.n ? "up" : "dim"]] })).join("")}</div>` : `<p class="ctx">Nada con lo que tienes ahora mismo.</p>`}`;
 }
 // Simular venta: vender un % de todo lo que tiene precio de mercado, con la comisión de verdad (recursos: la de tu isla, a la
 // mitad con VIP y −2,5 con el Trading Shrine; lo demás 10%) y cómo cambia con o sin VIP / Trading Shrine

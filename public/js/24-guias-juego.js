@@ -67,11 +67,13 @@ function wGuideCollect() {
   const list = d.rows.filter((r) => (f.kind === "all" || r.kind === f.kind) && (f.boost === "all" || (f.boost === "boost") === Boolean(r.buff))
     && (f.wd === "all" || r.rel.k === f.wd) && (f.own === "all" || r.own > 0) && (!q || r.name.toLowerCase().includes(q) || r.buff.toLowerCase().includes(q)));
   const sorters = { name: (a, b) => a.name.localeCompare(b.name), cheap: (a, b) => (a.price ?? 1e12) - (b.price ?? 1e12), dear: (a, b) => (b.price ?? -1) - (a.price ?? -1) };
-  list.sort(sorters[f.sort] || sorters.name);
+  const bal = gFarm() ? toNum(gFarm().balance) : null;
+  for (const r of list) { r.afford = bal != null && r.price != null && !r.own && r.price <= bal; r.can = r.own > 0 ? 2 : r.afford ? 1 : 0; }
+  list.sort((x, y) => (y.can - x.can) || (sorters[f.sort] || sorters.name)(x, y));
   const mine = d.rows.filter((r) => r.own > 0), worth = mine.reduce((s, r) => s + (r.price || 0) * r.own, 0);
   const wdNow = mine.filter((r) => r.rel.k === "yes").reduce((s, r) => s + (r.price || 0) * r.own, 0);
   const count = (k) => d.rows.filter((r) => r.rel.k === k).length;
-  const shown = list.slice(0, 250);
+  const shown = list.slice(0, 150);
   return `<div class="kstrip">
       ${Kcell("En el juego", fmt(d.rows.length, 0), `${fmt(d.rows.filter((r) => r.kind === "collectible").length, 0)} coleccionables · ${fmt(d.rows.filter((r) => r.kind === "wearable").length, 0)} prendas`)}
       ${Kcell("Con boost", fmt(d.rows.filter((r) => r.buff).length, 0), "el resto es decoración")}
@@ -85,14 +87,12 @@ function wGuideCollect() {
       ${gFarm() ? gTabs("gcf", `own|${f.own}`, [["own|all", "Todos"], ["own|mine", "Los míos"]]) : ""}
       ${gTabs("gcf", `sort|${f.sort}`, [["sort|name", "Nombre"], ["sort|cheap", "Más baratos"], ["sort|dear", "Más caros"]])}
     </div>
-    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Objeto</th><th>Tipo</th><th>Qué hace</th><th>Retiro</th><th class="r">Floor</th><th class="r">Tienes</th></tr></thead><tbody>
-    ${shown.map((r) => `<tr ${r.kind === "wearable" && G.wearableIds[r.name] != null ? `data-open="wearables-${G.wearableIds[r.name]}"` : G.itemIds?.[r.name] != null ? `data-open="collectibles-${G.itemIds[r.name]}"` : ""}>
-      <td class="w">${Gi(r.name, 18)} ${esc(r.name)}</td><td class="ctx">${r.kind === "wearable" ? "Prenda" : "Coleccionable"}</td>
-      <td class="ctx wrap">${esc(r.buff) || `<span class="faint">decorativo</span>`}</td>
-      <td><span class="tag ${WD_ES[r.rel.k][1]}">${WD_ES[r.rel.k][0]}${r.rel.at ? ` · ${new Date(r.rel.at).toLocaleDateString(LOCALE, { day: "numeric", month: "short", year: "numeric" })}` : ""}</span></td>
-      <td class="r mono">${r.price == null ? "—" : fmt(r.price, r.price < 1 ? 3 : 2)}</td><td class="r mono ${r.own ? "" : "dim"}">${r.own ? fmt(r.own, 0) : "—"}</td></tr>`).join("")}
-    </tbody></table></div>
-    <div class="mod-f"><span>${list.length > shown.length ? `Mostrando ${shown.length} de ${fmt(list.length, 0)}: afina con los filtros o el buscador` : `${fmt(list.length, 0)} resultados`}</span><span>Fechas de retiro: withdrawables.ts del juego</span></div>`;
+    <div class="cb-cards">${shown.map((r) => `<div ${r.kind === "wearable" && G.wearableIds[r.name] != null ? `data-open="wearables-${G.wearableIds[r.name]}"` : G.itemIds?.[r.name] != null ? `data-open="collectibles-${G.itemIds[r.name]}"` : ""} style="cursor:pointer;display:contents">${ItemCard({ name: r.name, can: r.can,
+      tags: `<span class="tag">${r.kind === "wearable" ? "prenda" : "coleccionable"}</span>${r.own ? `<span class="tag green">tienes ${fmt(r.own, 0)}</span>` : r.afford ? `<span class="tag sun">te llega</span>` : ""}`,
+      sub: esc(r.buff) || `<span class="faint">decorativo</span>`,
+      body: `<div class="ctx"><span class="tag ${WD_ES[r.rel.k][1]}">${WD_ES[r.rel.k][0]}${r.rel.at ? ` · ${new Date(r.rel.at).toLocaleDateString(LOCALE, { day: "numeric", month: "short", year: "numeric" })}` : ""}</span></div>`,
+      stats: [["Floor", r.price == null ? "—" : fmt(r.price, r.price < 1 ? 3 : 2)], ["Tienes", r.own ? fmt(r.own, 0) : "—", r.own ? "up" : "dim"], ["Valen los tuyos", r.own && r.price ? fmt(r.price * r.own, 2) : "—"]] })}</div>`).join("")}</div>
+    <div class="mod-f"><span>Primero lo tuyo y lo que te llega con tu FLOWER · ${list.length > shown.length ? `mostrando ${shown.length} de ${fmt(list.length, 0)}: afina con los filtros o el buscador` : `${fmt(list.length, 0)} resultados`}</span><span>Fechas de retiro: withdrawables.ts del juego</span></div>`;
 }
 ACTIONS.gcf = (v) => { const [k, x] = v.split("|"); S.gcol[k] = x; writeLS("gcol", { ...S.gcol, q: "" }); rerun(); };
 ACTIONS.gcq = (v) => { S.gcol.q = v; rerun(); };
@@ -499,15 +499,13 @@ function wGuideNpc() {
   const tk = G.chapterTickets?.[currentChapter()] || "tickets";
   const rewardTxt = (n, v) => (v == null ? "—" : n.kind === "COINS" ? `${Gi("Coins", 12, "coin")} ${compact(v)}` : n.kind === "FLOWER" ? `${fmt(v, 2)} FLW` : `${fmt(v, 0)} ${esc(tk)}`);
   return `<div class="toolbar" style="padding:8px 12px">${gTabs("gnk", S.gnKind, [["all", `Todos ${d.npcs.length}`], ...kinds.map((k) => [k, `${NPC_KIND_ES[k] || k} ${d.npcs.filter((n) => n.kind === k).length}`])])}</div>
-    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>NPC</th><th>Paga en</th><th class="r">Nivel</th><th class="r">Recompensa media</th><th class="r">Coste medio</th><th class="r">Pedidos posibles</th><th class="r">Le has entregado</th></tr></thead><tbody>
-    ${list.map((n) => `<tr data-act="gno:${esc(n.npc)}" style="cursor:pointer" class="${n.locked ? "dim" : ""}"><td class="w">${S.gnOpen === n.npc ? "▾" : "▸"} ${esc(NPC_ES(n.npc))}${n.locked ? ` <span class="tag">nivel ${n.level}</span>` : ""}</td>
-      <td class="ctx">${NPC_KIND_ES[n.kind] || n.kind}</td><td class="r mono">${n.level ?? "—"}</td>
-      <td class="r mono">${rewardTxt(n, n.avg)}${n.kind === "COINS" && n.rewardFlw != null ? `<div class="faint">${fmt(n.rewardFlw, 3)} FLW</div>` : ""}</td>
-      <td class="r mono">${n.avgCost == null ? "—" : fmt(n.avgCost, 3)}</td><td class="r mono">${n.orders.length}</td><td class="r mono dim">${gFarm() ? fmt(n.done, 0) : "—"}</td></tr>
-      ${S.gnOpen === n.npc ? `<tr><td colspan="7" style="padding:0"><table class="tbl"><tbody>${n.orders.map((o) => `<tr><td class="ctx wrap" style="padding-left:28px">${itemsTxt(o.items)}</td>
-        <td class="r mono">${rewardTxt(n, o.reward)}</td><td class="r mono">${costCell(o.c)} FLW</td></tr>`).join("")}</tbody></table></td></tr>` : ""}`).join("")}
-    </tbody></table></div>
-    <div class="mod-f"><span>Pedidos recogidos por sfl.world de todas las granjas${d.updated ? ` (actualizado hace ${esc(d.updated.replace(/ ago$/, "").replace("months", "meses").replace("month", "mes").replace("days", "días").replace("weeks", "semanas"))})` : ""} · pulsa un NPC para ver sus pedidos</span><span>Coste a floor sin tus boosts · tus pedidos de hoy, en Misiones</span></div>`;
+    <div class="cb-cards">${list.map((n) => { const doable = gFarm() ? n.orders.filter((o) => Object.entries(o.items || {}).every(([k, q]) => haveOf(k) >= q)).length : null; return { ...n, doable, can: !n.locked && doable ? doable : 0 }; })
+      .sort((a, b) => canFirst(a, b) || Number(a.locked) - Number(b.locked) || (a.level ?? 0) - (b.level ?? 0)).map((n) => ItemCard({ name: NPC_ES(n.npc), iconHtml: npcFace(n.npc), icon: Object.keys(n.orders[0]?.items || {})[0], can: n.can,
+        tags: `<span class="tag">${esc(NPC_KIND_ES[n.kind] || n.kind)}</span>${n.locked ? `<span class="tag">nivel ${n.level}</span>` : ""}${n.can ? `<span class="tag green">${n.can} pedido${n.can > 1 ? "s" : ""} que ya puedes</span>` : ""}`,
+        sub: `da de media ${rewardTxt(n, n.avg)}${n.kind === "COINS" && n.rewardFlw != null ? ` (${fmt(n.rewardFlw, 3)} FLW)` : ""} · ${n.orders.length} pedidos posibles`,
+        body: `<div class="cb-ing">${n.orders.slice().sort((a, b) => Number(Object.entries(b.items || {}).every(([k, q]) => haveOf(k) >= q)) - Number(Object.entries(a.items || {}).every(([k, q]) => haveOf(k) >= q)) || (a.c.v || 0) - (b.c.v || 0)).slice(0, 5).map((o) => { const ok = gFarm() && Object.entries(o.items || {}).every(([k, q]) => haveOf(k) >= q); return `<div>${Gi(Object.keys(o.items || {})[0], 22)}<span>${itemsTxt(o.items, 0, 12)}</span><b class="${ok ? "up" : ""}">${costCell(o.c)}</b></div>`; }).join("")}${n.orders.length > 5 ? `<div class="faint">+${n.orders.length - 5} pedidos más</div>` : ""}</div>`,
+        stats: [["Coste medio", n.avgCost == null ? "—" : fmt(n.avgCost, 3)], ["Nivel", n.level ?? "—"], ["Le has entregado", gFarm() ? fmt(n.done, 0) : "—"]] })).join("")}</div>
+    <div class="mod-f"><span>Primero los NPCs con algún pedido que ya puedes hacer · pedidos recogidos por sfl.world de todas las granjas${d.updated ? ` (actualizado hace ${esc(d.updated.replace(/ ago$/, "").replace("months", "meses").replace("month", "mes").replace("days", "días").replace("weeks", "semanas"))})` : ""} · pulsa un NPC para ver sus pedidos</span><span>Coste a floor sin tus boosts · tus pedidos de hoy, en Misiones</span></div>`;
 }
 ACTIONS.gnk = (v) => { S.gnKind = v; writeLS("gnKind", v); rerun(); };
 ACTIONS.gno = (v) => { S.gnOpen = S.gnOpen === v ? null : v; rerun(); };
@@ -551,11 +549,12 @@ function wGuideShops() {
   } else {
     const act = farm?.farmActivity || {}, sun = marketOnly("Sunstone"), obs = marketOnly("Obsidian");
     body = `<div class="kstrip">${Kcell("Sunstone", sun != null ? `${fmt(sun, 2)}<small>FLW</small>` : "—", "floor de hoy", "sun")}${Kcell("Obsidian", obs != null ? `${fmt(obs, 2)}<small>FLW</small>` : "—", "3 Obsidian = 1 Sunstone en el canje")}${Kcell("Tus Sunstone", farm ? fmt(toNum(farm.inventory?.Sunstone), 0) : "—", "")}</div>
-      <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Nodo</th><th>Isla</th><th class="r">Precio base</th><th class="r">Sube por compra</th><th class="r">Ya compraste</th><th class="r">El siguiente</th><th class="r">En FLOWER</th><th class="r">En Obsidian</th></tr></thead><tbody>
-      ${Object.entries(G.nodePrices || {}).map(([n, x]) => { const bought = toNum(act[`${n} Bought`]), next = x.price + bought * x.increase; return `<tr><td class="w">${Gi(n, 18)} ${esc(n)}${Object.keys(x.items || {}).length > 1 ? ` <span class="ctx">+ ${Object.keys(x.items).filter((k) => k !== n).join(", ")}</span>` : ""}</td>
-        <td class="ctx">${esc(ISLAND_ES[x.requiredIsland] || x.requiredIsland)}</td><td class="r mono">${x.price}</td><td class="r mono">+${x.increase}</td><td class="r mono ${bought ? "" : "dim"}">${farm ? bought : "—"}</td>
-        <td class="r mono"><b>${next}</b></td><td class="r mono">${sun != null ? fmt(next * sun, 2) : "—"}</td><td class="r mono dim">${next * 3}</td></tr>`; }).join("")}
-      </tbody></table></div><div class="mod-f"><span>En Infernos (nivel 30+): cada compra sube el precio del siguiente nodo del mismo tipo · precio en Sunstone</span></div>`;
+      <div class="cb-cards">${Object.entries(G.nodePrices || {}).map(([n, x]) => { const bought = toNum(act[`${n} Bought`]), next = x.price + bought * x.increase, have = farm ? toNum(farm.inventory?.Sunstone) : null; return { n, x, bought, next, have, can: have != null ? Math.floor(have / next) : null }; })
+        .sort((a, b) => canFirst(a, b) || a.next - b.next).map((r) => ItemCard({ name: r.n, can: r.can,
+          tags: `<span class="tag">isla ${esc(ISLAND_ES[r.x.requiredIsland] || r.x.requiredIsland)}</span>${r.bought ? `<span class="tag">compraste ${r.bought}</span>` : ""}`,
+          sub: `base ${r.x.price} · +${r.x.increase} por cada compra${Object.keys(r.x.items || {}).length > 1 ? ` · trae también ${Object.keys(r.x.items).filter((k) => k !== r.n).join(", ")}` : ""}`,
+          body: `<div class="cb-ing"><div>${Gi("Sunstone", 22)}<span>Sunstone (el siguiente)</span><b class="${r.have == null ? "" : r.have >= r.next ? "up" : "down"}">${r.next}</b></div></div>`,
+          stats: [["En FLOWER", sun != null ? fmt(r.next * sun, 2) : "—"], ["En Obsidian", r.next * 3], ["Puedes comprar", r.can == null ? "—" : r.can ? `${r.can}×` : "no", r.can ? "up" : "dim"]] })).join("")}</div><div class="mod-f"><span>En Infernos (nivel 30+): cada compra sube el precio del siguiente nodo del mismo tipo · precio en Sunstone</span></div>`;
   }
   return `<div class="toolbar" style="padding:8px 12px">${tabs}</div>${body}`;
 }
