@@ -238,7 +238,7 @@ const isVip = () => has("farm") && (store.farm.data.farm.vip?.expiresAt || 0) > 
 // Precio en FLOWER por unidad: floor del mercado; si no se vende, su receta; coins a la tasa elegida.
 function priceBook() {
   const a = store.activity?.data;
-  const key = `${a?.date}|${coinRate()}|${a ? Object.keys(a.items).length : 0}`;
+  const key = `${a?.date}|${coinRate()}|${a ? Object.keys(a.items).length : 0}|${store.fx?.at || 0}|${S.gemPack || ""}`;
   if (priceBook.c?.key === key && priceBook.c.a === a) return priceBook.c.fn;
   const cache = {};
   const fn = (name, depth = 0) => {
@@ -247,6 +247,8 @@ function priceBook() {
     let v = null, src = null;
     if (name === "coins") { v = 1 / coinRate(); src = "coins"; }
     else if (name === "sfl") { v = 1; src = "flower"; }
+    // Gemas: no se venden; valen lo que cuestan en la tienda (el paquete elegido en Misiones o el más barato)
+    else if (name === "Gem") { v = flowerPerGem(); src = v != null ? "gemas" : null; }
     else {
       const id = G.itemIds[name], wid = G.wearableIds[name];
       const it = a && (id != null ? a.items[`collectibles-${id}`] : wid != null ? a.items[`wearables-${wid}`] : null);
@@ -495,59 +497,65 @@ function wMissionKpis() {
 const itemChip = (l) => `<span class="need ${l.miss ? "miss" : "ok"}" title="${esc(l.name)} · tienes ${fmt(l.have)} · ${l.unit != null ? `${fmt(l.unit)} FLOWER/u (${l.src})` : "sin precio"}">
   ${esc(l.name === "coins" ? "Coins" : l.name === "sfl" ? "FLOWER" : l.name)} <b>${compact(Math.min(l.have, l.qty))}/${compact(l.qty)}</b></span>`;
 
+// Fila de lo que piden con lo que tienes (verde si te llega)
+const needRow = (l) => `<div title="${esc(l.name)} · tienes ${fmt(l.have)}${l.unit != null ? ` · ${fmt(l.unit)} FLOWER/u (${l.src})` : " · sin precio"}">${Gi(l.name === "coins" ? "Coins" : l.name, 22, l.name === "coins" ? "coin" : "")}<span>${esc(l.name === "coins" ? "Coins" : l.name === "sfl" ? "FLOWER" : l.name)}</span><b class="${l.miss ? "down" : "up"}">${compact(Math.min(l.have, l.qty))}/${compact(l.qty)}</b></div>`;
+
 function wDeliveries() {
   const m = missionModel();
-  const list = (S.showDone ? m.orders : m.open).slice().sort((a, b) =>
-    (a.done - b.done) || (a.kind === "tickets" ? 0 : 1) - (b.kind === "tickets" ? 0 : 1) || (a.perTicket ?? -a.profit ?? 0) - (b.perTicket ?? -b.profit ?? 0));
-  setSub("ms-orders", `${m.open.length} abiertos · ordenados por coste por ticket`);
+  const list = (S.showDone ? m.orders : m.open).map((o) => ({ ...o, can: !o.done && !o.waiting && o.ready ? 1 : 0 })).sort((a, b) =>
+    canFirst(a, b) || (a.done - b.done) || (a.kind === "tickets" ? 0 : 1) - (b.kind === "tickets" ? 0 : 1) || (a.perTicket ?? -a.profit ?? 0) - (b.perTicket ?? -b.profit ?? 0));
+  setSub("ms-orders", `${m.open.length} abiertos · ${list.filter((o) => o.can).length} entregables ya`);
   if (!list.length) return Empty("scroll", "Sin pedidos", "No tienes entregas pendientes.");
   const perTickets = m.ticketOrders.map((o) => o.perTicket).filter((x) => x != null).sort((a, b) => a - b);
   const median = perTickets[Math.floor(perTickets.length / 2)] ?? 0;
-  return `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>NPC</th><th>Pide${Legend("needs")}</th><th class="r">Recompensa</th><th class="r">Valor pedido</th><th class="r">Coste / ticket${Legend("perTicket")}</th><th class="r">Falta comprar</th><th>Estado</th></tr></thead><tbody>
-    ${list.map((o) => {
-      const boostTip = o.boosts?.length ? ` data-tip="${esc(`Recompensa con tus boosts|${o.boosts.map((b) => (b.v == null ? `${b.name} ×2` : `${b.name} +${fmt(b.v * 100, 0)}%`)).join(" · ")}|×${fmt(o.boostMul, 2)} sobre la base`)}"` : "";
-      const reward = o.kind === "tickets" ? `<b class="sun-t">${o.tickets}</b> tickets` : o.kind === "flower" ? `<b${boostTip}>${fmt(o.rewardSfl, 2)}</b> FLOWER` : o.kind === "coins" ? `<b${boostTip}>${fmt(o.rewardCoins, 0)}</b> coins` : "—";
-      const verdict = o.kind === "tickets"
-        ? `<span class="${o.perTicket <= median ? "up" : "down"}">${fmt(o.perTicket, 3)}</span>`
-        : o.profit != null ? `<span class="${o.profit >= 0 ? "up" : "down"}">${o.profit >= 0 ? "+" : ""}${fmt(o.profit, 2)}</span><div class="ctx">${o.profit >= 0 ? "conviene entregar" : "conviene vender"}</div>` : "—";
-      const state = o.done ? `<span class="tag">hecho</span>` : o.waiting ? `<span class="tag">en ${dur(o.readyAt - now())}</span>`
-        : o.ready ? `<span class="ok-tag">ENTREGABLE</span>` : `<span class="tag red">faltan ${o.lines.filter((l) => l.miss).length}</span>`;
-      return `<tr class="${o.done ? "dim" : ""}"><td><b>${esc(NPC_ES(o.from))}</b>${o.canSkip && !o.done ? `<div class="ctx">se puede saltar</div>` : ""}</td>
-        <td class="needs">${o.lines.map(itemChip).join("")}${o.unknown.length ? `<span class="tag" title="Sin precio de mercado ni receta">?${o.unknown.length}</span>` : ""}</td>
-        <td class="r">${reward}</td><td class="r">${fmt(o.net, 2)}</td><td class="r">${verdict}</td>
-        <td class="r ${o.missingCost ? "" : "dim"}">${o.missingCost ? fmt(o.missingCost, 2) : "—"}</td><td>${state}</td></tr>`;
-    }).join("")}</tbody></table></div>
-    <div class="mod-f"><span>Valor = lo que ganarías vendiendo esos items en el mercado${S.p2pTax ? ` (${taxNote()})` : ""}; herramientas y comidas por receta; coins a ${fmt(coinRate(), 0)}/FLOWER. La recompensa ya lleva tus boosts de entrega y la entrega doble.</span>
-      <span>verde = por debajo de la mediana (${fmt(median, 3)})</span></div>`;
+  return `<div class="cb-cards">${list.map((o) => {
+    const reward = o.kind === "tickets" ? `${o.tickets} tickets` : o.kind === "flower" ? `${fmt(o.rewardSfl, 2)} FLOWER` : o.kind === "coins" ? `${fmt(o.rewardCoins, 0)} coins` : "—";
+    const state = o.done ? `<span class="tag">hecho</span>` : o.waiting ? `<span class="tag">en ${dur(o.readyAt - now())}</span>`
+      : o.ready ? `<span class="tag green">entregable</span>` : `<span class="tag red">faltan ${o.lines.filter((l) => l.miss).length}</span>`;
+    const verdict = o.kind === "tickets" ? ["Coste/ticket", o.perTicket == null ? "—" : fmt(o.perTicket, 3), o.perTicket != null && o.perTicket <= median ? "up" : "down"]
+      : ["Balance", o.profit == null ? "—" : `${o.profit >= 0 ? "+" : ""}${fmt(o.profit, 2)}`, o.profit == null ? "" : o.profit >= 0 ? "up" : "down"];
+    return ItemCard({ name: NPC_ES(o.from), icon: o.lines[0]?.name, can: o.can, iconHtml: npcFace(o.from),
+      tags: `${state}${o.canSkip && !o.done ? `<span class="tag">se puede saltar</span>` : ""}`,
+      sub: `Da <b>${reward}</b>${o.boosts?.length ? ` · con ${o.boosts.map((b) => b.name).join(", ")}` : ""}${o.kind !== "tickets" && o.profit != null ? ` · ${o.profit >= 0 ? "conviene entregar" : "conviene vender"}` : ""}`,
+      body: `<div class="cb-ing">${o.lines.map(needRow).join("")}${o.unknown.length ? `<div class="faint">${o.unknown.length} sin precio</div>` : ""}</div>`,
+      stats: [["Valor pedido", fmt(o.net, 2)], verdict, ["Falta comprar", o.missingCost ? fmt(o.missingCost, 2) : "—", o.missingCost ? "down" : "up"]],
+    });
+  }).join("")}</div>
+    <div class="mod-f"><span>Primero lo que puedes entregar ya · valor = lo que ganarías vendiendo esos items${S.p2pTax ? ` (${taxNote()})` : ""}; herramientas y comidas por receta; coins a ${fmt(coinRate(), 0)}/FLOWER · la recompensa lleva tus boosts y la entrega doble</span>
+      <span>coste/ticket en verde = por debajo de la mediana (${fmt(median, 3)})</span></div>`;
 }
 
 function wChores() {
   const m = missionModel();
-  const board = m.board.filter((c) => S.showDone || !c.done).sort((a, b) => (a.done - b.done) || (b.p ?? 0) - (a.p ?? 0));
-  const weekly = m.weekly.filter((c) => S.showDone || !c.done);
-  setSub("ms-chores", `${m.board.filter((c) => !c.done).length} del tablero · ${weekly.length} semanales`);
-  const row = (name, who, p, prog, req, reward, done) => `<div class="chore ${done ? "done" : ""}">
-    <div class="ch-h"><span class="nm">${esc(name)}</span>${who ? `<span class="ctx">${esc(who)}</span>` : ""}<span class="n ch-r">${reward}</span></div>
-    <div class="ch-p">${p != null ? `<div class="pbar${p >= 1 ? " done" : ""}"><i style="width:${(p * 100).toFixed(0)}%"></i></div><span class="n">${fmt(Math.min(prog, req), 0)}/${fmt(req, 0)}</span>` : `<span class="ctx">progreso no disponible</span>`}</div></div>`;
   const rewardTxt = (c) => Object.entries(c.reward?.items || {}).map(([k, v]) => `${v} ${k}`).join(", ") || (c.reward?.coins ? `${fmt(c.reward.coins, 0)} coins` : "");
-  return (board.length ? `<div class="grp">Tablero de tareas</div>${board.map((c) => row(c.name, NPC_ES(c.npc), c.p, c.progress, c.def?.amount, rewardTxt(c), c.done)).join("")}` : "") +
-    (weekly.length ? `<div class="grp">Semanales</div>${weekly.map((c) => row(c.description, "", c.p, c.progress, c.requirement, "", c.done)).join("")}` : "") ||
+  // Primero las que ya puedes reclamar (progreso completo), luego las más avanzadas
+  const board = m.board.filter((c) => S.showDone || !c.done).map((c) => ({ ...c, can: !c.done && c.p >= 1 ? 1 : 0 })).sort((a, b) => canFirst(a, b) || (a.done - b.done) || (b.p ?? 0) - (a.p ?? 0));
+  const weekly = m.weekly.filter((c) => S.showDone || !c.done).map((c) => ({ ...c, can: !c.done && c.p >= 1 ? 1 : 0 })).sort((a, b) => canFirst(a, b) || (b.p ?? 0) - (a.p ?? 0));
+  setSub("ms-chores", `${m.board.filter((c) => !c.done).length} del tablero · ${weekly.length} semanales`);
+  const card = (name, npc, icon, p, prog, req, reward, done, can) => ItemCard({ name, icon, can, iconHtml: npc ? npcFace(npc) : null,
+    tags: done ? `<span class="tag">hecha</span>` : can ? `<span class="tag green">lista para reclamar</span>` : "",
+    sub: `${npc ? `${esc(NPC_ES(npc))} · ` : ""}${reward ? `da ${esc(reward)}` : ""}`,
+    body: p != null ? `<div class="pbar${p >= 1 ? " done" : ""}"><i style="width:${(Math.min(1, p) * 100).toFixed(0)}%"></i></div><div class="ctx" style="margin-top:6px">${fmt(Math.min(prog, req), 0)} / ${fmt(req, 0)}</div>` : `<div class="ctx">progreso no disponible</div>`,
+  });
+  return (board.length ? `<div class="grp">Tablero de tareas</div><div class="cb-cards">${board.map((c) => card(c.name, c.npc, Object.keys(c.reward?.items || {})[0], c.p, c.progress, c.def?.amount, rewardTxt(c), c.done, c.can)).join("")}</div>` : "") +
+    (weekly.length ? `<div class="grp">Semanales</div><div class="cb-cards">${weekly.map((c) => card(c.description, null, "Scroll", c.p, c.progress, c.requirement, "", c.done, c.can)).join("")}</div>` : "") ||
     Empty("check", "Todo hecho", "No quedan tareas pendientes.");
 }
 
 function wBounties() {
   const m = missionModel();
-  const list = m.bounties.slice().sort((a, b) => (b.profit ?? -Infinity) - (a.profit ?? -Infinity));
-  const good = list.filter((b) => b.profit != null && b.profit > 0);
-  setSub("ms-bounties", `${list.length} abiertos · ${good.length} rentables`);
+  // Primero los que puedes vender ya (tienes el item), y entre ellos los que más dejan
+  const list = m.bounties.map((b) => ({ ...b, can: !b.isAnimal && b.have >= 1 ? 1 : 0 })).sort((a, b) => canFirst(a, b) || (b.profit ?? -Infinity) - (a.profit ?? -Infinity));
+  setSub("ms-bounties", `${list.length} abiertos · ${list.filter((b) => b.can).length} puedes vender ya · ${list.filter((b) => b.profit > 0).length} rentables`);
   if (!list.length) return Empty("coin", "Sin bounties", "");
-  const rewardTxt = (b) => [b.coins ? `${fmt(b.coins, 0)} coins` : "", b.sfl ? `${fmt(b.sfl, 2)} FLOWER` : "", ...Object.entries(b.items || {}).map(([k, v]) => `${v} ${k}`)].filter(Boolean).join(" + ");
-  return `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Piden</th><th class="r">Tienes</th><th>Pagan</th><th class="r">Valor item</th><th class="r">Balance${Legend("profit")}</th></tr></thead><tbody>
-    ${list.map((b) => `<tr><td><b>${esc(b.name)}</b>${b.isAnimal ? ` <span class="tag">animal nv ${b.level}</span>` : ""}</td>
-      <td class="r ${b.have ? "" : "dim"}">${b.isAnimal ? "—" : fmt(b.have)}</td><td>${esc(rewardTxt(b))}</td>
-      <td class="r dim">${b.itemVal != null ? fmt(b.itemVal) : "—"}</td>
-      <td class="r">${b.profit != null ? `<span class="${b.profit >= 0 ? "up" : "down"}">${b.profit >= 0 ? "+" : ""}${fmt(b.profit, 2)}</span>` : `<span class="dim">${fmt(b.rewardValue, 2)}</span>`}</td></tr>`).join("")}
-    </tbody></table></div><div class="mod-f"><span>Balance = recompensa − lo que sacarías vendiendo el item</span><span>animales: solo valor de la recompensa</span></div>`;
+  const rewardRows = (b) => [b.coins ? `<div>${Gi("Coins", 22, "coin")}<span>Coins</span><b>${fmt(b.coins, 0)}</b></div>` : "", b.sfl ? `<div>${Gi("FLOWER", 22, "sun")}<span>FLOWER</span><b>${fmt(b.sfl, 2)}</b></div>` : "",
+    ...Object.entries(b.items || {}).map(([k, v]) => `<div>${Gi(k, 22)}<span>${esc(k)}</span><b>×${fmt(v, 0)}</b></div>`)].join("");
+  return `<div class="cb-cards">${list.map((b) => ItemCard({ name: b.name, can: b.can,
+    tags: `${b.isAnimal ? `<span class="tag">animal nivel ${b.level}</span>` : ""}${b.can ? `<span class="tag green">lo tienes</span>` : ""}`,
+    sub: b.isAnimal ? "se entrega un animal de ese nivel" : `piden 1 · tienes ${fmt(b.have)}`,
+    body: `<div class="cb-ing">${rewardRows(b)}</div>`,
+    stats: [["Valor del item", b.itemVal != null ? fmt(b.itemVal) : "—"], ["Pagan", fmt(b.rewardValue, 2)], ["Balance", b.profit != null ? `${b.profit >= 0 ? "+" : ""}${fmt(b.profit, 2)}` : "—", b.profit == null ? "" : b.profit >= 0 ? "up" : "down"]],
+  })).join("")}</div><div class="mod-f"><span>Primero lo que puedes vender ya · balance = lo que pagan − lo que sacarías vendiendo el item</span><span>animales: solo valor de la recompensa</span></div>`;
 }
 
 // Una vez: el valor de las coins pasa a ser automático (antes se escribía a mano en Misiones)

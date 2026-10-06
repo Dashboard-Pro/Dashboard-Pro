@@ -27,6 +27,8 @@ const CardStats = (cells) => `<div class="cb-stats" style="grid-template-columns
 const ItemCard = ({ icon, iconHtml, name, tags = "", sub = "", body, stats, can }) => `<div class="cb-card${can > 0 ? " can" : ""}">
   <div class="cb-head">${iconHtml || Gi(icon || name, 40)}<div style="min-width:0"><b>${esc(name)}</b>${tags}${sub ? `<div class="ctx">${sub}</div>` : ""}</div></div>
   <div class="cb-body">${body}</div>${stats ? CardStats(stats) : ""}</div>`;
+// Retrato de un NPC con su ropa del juego (npcs.ts) para las tarjetas, o null si no lo conocemos
+const npcFace = (npc) => { const look = G.npcLooks?.[String(npc || "").toLowerCase()]; return look ? `<img class="npc-face" src="${esc(bumpkinImageUrl(look, 100))}" alt="" width="52" height="52" loading="lazy" onerror="this.remove()">` : null; };
 const canMake = (items, mult = 1, coins = 0) => (gFarm() ? Math.min(...Object.entries(items || {}).map(([k, q]) => Math.floor(haveOf(k) / (q * mult))), coins ? Math.floor(toNum(gFarm().coins) / (coins * mult)) : Infinity, Infinity) : null);
 const gTabs = (key, cur, opts) => `<div class="seg">${opts.map(([v, l]) => `<button data-act="${key}:${esc(String(v))}" class="${String(cur) === String(v) ? "on" : ""}">${l}</button>`).join("")}</div>`;
 // Buscadores de las guías: fuera del cuerpo del módulo (en la cabecera), data-inp="acción"
