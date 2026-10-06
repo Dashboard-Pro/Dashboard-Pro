@@ -567,22 +567,34 @@ function wGuideAnimals() {
   const seg = Seg(types.map((x) => [x, ANIMAL_ES[x] || x]), d.t, "act").replace(/data-act="([^"]+)"/g, 'data-act="gat:$1"');
   const dropTxt = (dr) => dr.items.map((i) => `${Gi(i.item, 12)} ${fmt(i.amt, i.amt % 1 ? 2 : 0)}`).join(" ") || "—";
   const diff = d.total.value - d.total.cost;
+  // Tus animales de este tipo por nivel: los niveles en los que tienes alguno (y su comida) van primero
+  const farm = gFarm(), mineAt = {};
+  if (farm) for (const key of ["henHouse", "barn", "pigpen"]) for (const a of Object.values(farm[key]?.animals || {})) if (a?.type === d.t) { const L = animalLevel(a.type, toNum(a.experience)); mineAt[L] = (mineAt[L] || 0) + 1; }
+  const foodRow = (label, f, xp, need) => f ? `<div title="${farm ? `tienes ${fmt(haveOf(f), 1)}` : ""}">${Gi(f, 22)}<span>${label}: ${esc(f)} · ${fmt(xp, 0)} XP</span><b class="${!farm || need == null ? "" : haveOf(f) >= need ? "up" : "down"}">${need == null ? "" : `×${fmt(need, 1)}`}</b></div>` : "";
+  const cards = d.rows.map((r) => {
+    const need = r.rations == null ? null : r.rations * d.qty * d.mult;
+    const n = mineAt[r.from] || 0;
+    return { ...r, need, n, can: n && r.cheap && (d.free || haveOf(r.cheap.f) >= need) ? n : 0 };
+  }).sort((a, b) => canFirst(a, b) || Number(b.n > 0) - Number(a.n > 0) || a.from - b.from);
   return `<div class="toolbar" style="padding:8px 12px">${seg}</div>${bx.panel}
     <div class="kstrip">
       ${Kcell(esc(ANIMAL_ES[d.t] || d.t), `${fmt(d.coins || 0, 0)}<small>coins</small>`, `${esc(d.house || "")} · ${d.qty} comida${d.qty === 1 ? "" : "s"} por toma${d.mult !== 1 ? ` ×${fmt(d.mult, 2)}` : ""} · duerme ${d.sleep} h`)}
+      ${Kcell("Los tuyos", farm ? fmt(Object.values(mineAt).reduce((s, x) => s + x, 0), 0) : "—", farm ? Object.entries(mineAt).sort((a, b) => a[0] - b[0]).map(([l, c]) => `nv ${l}: ${c}`).join(" · ") || "ninguno" : "")}
       ${Kcell(`De 0 a ${d.max}: comida`, `${fmt(d.total.cost, 3)}<small>FLW</small>`, "comprando la comida más barata por XP")}
       ${Kcell("Lo que suelta", `${fmt(d.total.value, 3)}<small>FLW</small>`, `diferencia <b class="${diff >= 0 ? "up" : "down"}">${fmt(diff, 3)}</b>`, diff >= 0 ? "up" : "")}
       ${Kcell(`En nivel ${d.max} (bucle)`, d.loop.cost != null && d.loop.drop.value != null ? `${fmt(d.loop.drop.value - d.loop.cost, 3)}<small>FLW/vuelta</small>` : "—", `${fmt(d.loop.step, 0)} XP · comida ${d.loop.cost == null ? "—" : fmt(d.loop.cost, 3)} · suelta ${dropTxt(d.loop.drop)}`, "sun")}
     </div>
-    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Nivel</th><th class="r">XP</th><th>Produce</th><th class="r">Vale</th><th>Su favorita</th><th>La más barata por XP</th><th class="r">Raciones</th><th class="r">Coste del nivel</th></tr></thead><tbody>
-    ${d.rows.map((r) => `<tr><td class="w">${r.from} → ${r.to}</td><td class="r mono">${fmt(r.step, 0)} <span class="faint">Σ ${fmt(r.cum, 0)}</span></td>
-      <td>${dropTxt(r.drop)}</td><td class="r mono">${r.drop.value == null ? "—" : fmt(r.drop.value, 3)}</td>
-      <td class="ctx">${r.fav ? `${Gi(r.fav.f, 12)} ${esc(r.fav.f)} ${fmt(r.fav.xp, 0)} XP` : "—"}</td>
-      <td class="ctx">${r.cheap ? `${Gi(r.cheap.f, 12)} ${esc(r.cheap.f)} ${fmt(r.cheap.xp, 0)} XP` : "—"}</td>
-      <td class="r mono">${r.rations == null ? "—" : fmt(r.rations * d.qty * d.mult, 1)}</td>
-      <td class="r mono">${r.cost == null ? "—" : fmt(r.cost, 3)} <span class="faint">Σ ${fmt(r.cumCost, 3)}</span></td></tr>`).join("")}
-    </tbody></table></div>
-    <div class="mod-f"><span>La XP de cada comida depende del nivel que tiene el animal (la fila 5 → 6 usa la tabla del 5) · raciones = comidas que gastas, con tus multiplicadores</span><span>Produce con tus boosts de producción (modo «Mis boosts»)</span></div>`;
+    <div class="cb-cards">${cards.map((r) => ItemCard({ name: `Nivel ${r.from} → ${r.to}`, icon: d.t, can: r.can,
+      tags: r.n ? `<span class="tag green">tienes ${r.n} aquí</span>` : "",
+      sub: `${fmt(r.step, 0)} XP · Σ ${fmt(r.cum, 0)} desde el nivel 0`,
+      body: `<div class="cb-ing">
+        ${r.drop.items.map((i) => `<div>${Gi(i.item, 22)}<span>Al llegar da ${esc(i.item)}</span><b>×${fmt(i.amt, i.amt % 1 ? 2 : 0)}</b></div>`).join("")}
+        ${foodRow("La más barata", r.cheap?.f, r.cheap?.xp, r.need)}
+        ${r.fav && r.fav.f !== r.cheap?.f ? foodRow("Su favorita", r.fav.f, r.fav.xp, null) : ""}
+      </div>`,
+      stats: [["Coste del nivel", r.cost == null ? "—" : fmt(r.cost, 3)], ["Vale lo que da", r.drop.value == null ? "—" : fmt(r.drop.value, 3)], ["Σ coste", fmt(r.cumCost, 3)]],
+    })).join("")}</div>
+    <div class="mod-f"><span>Primero los niveles en los que tienes animales y te llega la comida · la XP de cada comida depende del nivel que tiene el animal · raciones con tus multiplicadores</span><span>Produce con tus boosts de producción (modo «Mis boosts»)</span></div>`;
 }
 ACTIONS.gat = (v) => { S.gaType = v; writeLS("gaType", v); rerun(); };
 

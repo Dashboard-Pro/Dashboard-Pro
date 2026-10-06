@@ -1234,3 +1234,4 @@ button.xland:hover { border-color: var(--sun); }
 .cb-ing div.best span { color: var(--text); }
 .cb-ing em.tag { font-style: normal; margin-left: 4px; }
 .npc-face { width: 52px; height: 52px; image-rendering: pixelated; border: 1px solid var(--line); background: var(--bg); flex: none; }
+.lv-badge { width: 40px; height: 40px; flex: none; display: grid; place-items: center; font: 700 14px var(--mono); color: var(--sun); border: 1px solid var(--line); background: var(--bg); }

@@ -429,31 +429,44 @@ function ascensionRows(xp, xpPerFlower) {
   return out;
 }
 function wGuideLevels() {
-  const d = levelGuideModel();
+  const d = levelGuideModel(), farm = gFarm(), LX = G.levelExperience || {};
   const flw = d.best?.xpPerFlower ? d.need / d.best.xpPerFlower : null;
-  const list = d.rows.filter((r) => !S.glOnly || r.unlocks.length);
+  // XP que tienes guardada en comida (con tus boosts): los niveles a los que llegas comiéndotela van primero
+  let stored = 0;
+  try { if (farm && has("activity")) stored = levelPlan().storedXp || 0; } catch { stored = 0; }
+  const reach = farm ? d.xp + stored : 0;
+  const list = d.rows.filter((r) => (S.glAll || !farm || r.l >= d.cur) && (!S.glOnly || r.unlocks.length)).map((r) => {
+    const toReach = farm ? Math.max(0, (LX[r.l + 1] ?? 0) - d.xp) : null;
+    return { ...r, toReach, can: farm && r.l >= d.cur && (LX[r.l + 1] ?? Infinity) <= reach ? 1 : 0 };
+  }).sort((a, b) => canFirst(a, b) || a.l - b.l).slice(0, S.glAll ? Infinity : 60);
+  const reachLvl = farm ? bumpkinLevel(reach).lvl : null;
   return `<div class="toolbar" style="padding:8px 12px;gap:10px;flex-wrap:wrap">
       <span class="ctx">Del nivel <b>${d.cur}</b> al</span><input class="inp" type="number" min="${d.cur + 1}" max="${d.max}" value="${d.target}" data-chg="glt" style="width:70px">
       <label class="toggle"><input type="checkbox" data-chg="glo" ${S.glOnly ? "checked" : ""}><i></i>Solo niveles que desbloquean algo</label>
+      ${farm ? `<label class="toggle"><input type="checkbox" data-act="glall" ${S.glAll ? "checked" : ""}><i></i>Ver también los pasados</label>` : ""}
     </div>
     <div class="kstrip">
-      ${Kcell("XP que te falta", compact(d.need), `${d.target - d.cur} niveles${gFarm() ? " contando la que ya tienes" : ""}`, "sun")}
+      ${Kcell("XP que te falta", compact(d.need), `${d.target - d.cur} niveles${farm ? " contando la que ya tienes" : ""}`, "sun")}
+      ${farm ? Kcell("Con tu comida guardada", `nivel ${reachLvl}`, `${compact(stored)} XP en comida · ${reachLvl > d.cur ? `subes ${reachLvl - d.cur} nivel${reachLvl - d.cur > 1 ? "es" : ""}` : "no llega al siguiente"}`, reachLvl > d.cur ? "green" : "") : ""}
       ${Kcell("Con la comida más rentable", flw != null ? `${fmt(flw, 1)}<small>FLW</small>` : "—", d.best ? `${esc(d.best.name)} · ${compact(d.best.xpPerFlower)} XP/FLOWER` : "sin precios")}
       ${Kcell("Puntos de habilidad", fmt(d.target - d.cur, 0), "1 por nivel")}
     </div>
-    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Nivel</th><th class="r">XP al siguiente</th><th class="r">XP total</th><th>Desbloquea</th></tr></thead><tbody>
-    ${list.map((r) => `<tr class="${r.l < d.cur ? "dim" : ""}"><td class="w">${r.l}${r.l === d.cur ? ` <span class="tag sun">tú</span>` : ""}${r.l === d.target ? ` <span class="tag green">objetivo</span>` : ""}</td>
-      <td class="r mono">${fmt(r.toNext, 0)}</td><td class="r mono dim">${fmt(r.total, 0)}</td>
-      <td class="ctx wrap">${r.unlocks.map((u) => `${Gi(u, 14)} ${esc(u)}`).join(" · ") || ""}</td></tr>`).join("")}
-    </tbody></table></div>
+    <div class="cb-cards">${list.map((r) => ItemCard({ name: `Nivel ${r.l} → ${r.l + 1}`, icon: r.unlocks[0] || "Bumpkin Salad", can: r.can,
+      iconHtml: r.unlocks[0] ? null : `<span class="lv-badge">${r.l + 1}</span>`,
+      tags: `${r.l === d.cur ? `<span class="tag sun">estás aquí</span>` : ""}${r.l + 1 === d.target ? `<span class="tag green">objetivo</span>` : ""}${r.can && r.l > d.cur ? `<span class="tag green">con tu comida</span>` : ""}`,
+      sub: `${fmt(r.toNext, 0)} XP · total ${compact(LX[r.l + 1] ?? r.total)}`,
+      body: r.unlocks.length ? `<div class="cb-ing">${r.unlocks.map((u) => `<div>${Gi(u, 22)}<span>Desbloquea ${esc(u)}</span><b></b></div>`).join("")}</div>` : `<div class="ctx">No desbloquea nada nuevo · +1 punto de habilidad</div>`,
+      stats: [["Te falta", r.toReach == null ? "—" : r.toReach ? compact(r.toReach) : "✓", r.toReach === 0 ? "up" : ""], ["Con comida rentable", r.toReach && d.best?.xpPerFlower ? `${fmt(r.toReach / d.best.xpPerFlower, 1)} FLW` : "—"]],
+    })).join("")}</div>
     <div class="grp">Ascensiones (más allá del nivel 150)</div>
-    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Ascensión</th><th class="r">Empieza con</th><th class="r">XP de la banda</th><th class="r">Te falta para empezarla</th><th class="r">Con la comida más rentable</th></tr></thead><tbody>
-    ${ascensionRows(gFarm() ? toNum(gFarm().bumpkin?.experience) : null, d.best?.xpPerFlower).map((r) => `<tr><td class="w">Ascensión ${r.a} <span class="faint">· niveles ${150 + (r.a - 1) * 50 + 1}–${150 + r.a * 50}</span></td>
-      <td class="r mono">${compact(r.start)}</td><td class="r mono">${compact(r.band)}</td><td class="r mono">${r.missStart == null ? "—" : r.missStart ? compact(r.missStart) : `<span class="up">ya</span>`}</td>
-      <td class="r mono">${r.flw == null ? "—" : r.flw ? `${compact(r.flw)} FLW` : "—"}</td></tr>`).join("")}
-    </tbody></table></div>
-    <div class="mod-f"><span>XP de cada nivel: level.ts · desbloqueos: semillas y edificios del juego · cada ascensión: 50 niveles, banda de 50M × 1,45 por ascensión (redondeada a 5M)</span><span>Ascender: llegar al 150 (y a cada banda completa) en la isla y subir de isla</span></div>`;
+    <div class="cb-cards">${ascensionRows(farm ? d.xp : null, d.best?.xpPerFlower).map((r) => ItemCard({ name: `Ascensión ${r.a}`, iconHtml: `<span class="lv-badge">A${r.a}</span>`, can: r.missStart === 0 ? 1 : 0,
+      sub: `niveles ${150 + (r.a - 1) * 50 + 1}–${150 + r.a * 50} · banda de ${compact(r.band)} XP`,
+      body: `<div class="ctx">Empieza con ${compact(r.start)} XP en total y se completa con ${compact(r.end)}.</div>`,
+      stats: [["Te falta para empezarla", r.missStart == null ? "—" : r.missStart ? compact(r.missStart) : "ya", r.missStart === 0 ? "up" : ""], ["Con comida rentable", r.flw ? `${compact(r.flw)} FLW` : "—"]],
+    })).join("")}</div>
+    <div class="mod-f"><span>Primero los niveles a los que llegas con la comida que tienes guardada · XP de cada nivel: level.ts · desbloqueos: semillas y edificios · cada ascensión: 50 niveles, banda de 50M × 1,45 por ascensión (redondeada a 5M)</span><span>Ascender: llegar al 150 (y a cada banda completa) y subir de isla</span></div>`;
 }
+ACTIONS.glall = () => { S.glAll = !S.glAll; rerun(); };
 ACTIONS.glt = (v) => { S.glTarget = Math.floor(toNum(v)) || 0; writeLS("glTarget", S.glTarget); rerun(); };
 ACTIONS.glo = (v, el) => { S.glOnly = el.checked; writeLS("glOnly", S.glOnly); rerun(); };
 
