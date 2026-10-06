@@ -763,10 +763,10 @@ body.is-cloud #nfRescan { display: none; }
 .form { display: flex; flex-direction: column; gap: 14px; }
 .form label { display: flex; flex-direction: column; gap: 6px; font: 600 10.5px var(--sans); letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); }
 .form .row { display: flex; align-items: center; gap: 12px; }
-.kv { display: grid; grid-template-columns: auto 1fr; margin: 0; }
+.kv { display: grid; grid-template-columns: auto minmax(0, 1fr); margin: 0; }
 .kv dt, .kv dd { padding: 8px 16px; border-bottom: 1px solid var(--line); margin: 0; }
 .kv dt { color: var(--muted); font-size: 12.5px; }
-.kv dd { font: 12.5px var(--mono); text-align: right; }
+.kv dd { font: 12.5px var(--mono); text-align: right; overflow-wrap: anywhere; }
 .prose { font-size: 13px; color: var(--muted); }
 .prose p { margin: 0 0 10px; }
 
@@ -872,10 +872,20 @@ body.is-cloud #nfRescan { display: none; }
   .dw-cols { grid-template-columns: 1fr; }
   .trees { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .toolbar input[type="text"] { width: 100%; }
+  /* Saldo, precio y refresco: a varias filas en vez de salirse de la pantalla */
+  .top-right { width: 100%; min-width: 0; align-items: stretch; }
+  .top-meta { flex-wrap: wrap; gap: 6px; min-width: 0; }
+  /* Pestañas de la cabecera de cada módulo: bajan a su fila y, si no caben, se desplazan de lado */
+  .mod-h { flex-wrap: wrap; }
+  .mod-h .act { flex: 1 1 100%; margin-left: 0; min-width: 0; flex-wrap: wrap; }
+  .seg { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .seg > button { flex: none; }
+  /* Con letra de menos de 16 px, el iPhone amplía la página al tocar un campo */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea { font-size: 16px; }
 }
 
 /* Valor de texto (nombres largos) dentro de una celda de KPI */
-.kcell .v .v-txt { font-size: 15px; line-height: 1.3; display: block; }
+.kcell .v .v-txt { font-size: 15px; line-height: 1.3; display: block; white-space: normal; }
 
 /* Comunidad: barra de tu posición dentro de tu grupo */
 .cm-pos { display: inline-block; width: 70px; height: 6px; background: var(--line); vertical-align: middle; margin-right: 8px; }
@@ -1214,9 +1224,9 @@ button.xland:hover { border-color: var(--sun); }
 /* ── Simulador de distribución ── */
 .ly-wrap { display: grid; grid-template-columns: minmax(0, 1fr) 300px; border-bottom: 1px solid var(--line); }
 .ly-scroll { overflow: auto; max-height: 78vh; background: #3c7bc0; }
-.ly-map { position: relative; margin: 0 auto; image-rendering: pixelated; touch-action: none; }
+.ly-map { position: relative; margin: 0 auto; image-rendering: pixelated; }
 .ly-bg { position: absolute; max-width: none; pointer-events: none; image-rendering: pixelated; transform-origin: center; }
-.ly-i { position: absolute; display: grid; place-items: center; cursor: grab; border: 1px solid rgba(0,0,0,.25); background: rgba(255,255,255,.06); user-select: none; }
+.ly-i { position: absolute; display: grid; place-items: center; cursor: grab; border: 1px solid rgba(0,0,0,.25); background: rgba(255,255,255,.06); user-select: none; touch-action: none; }
 .ly-i img { pointer-events: none; image-rendering: pixelated; }
 .ly-i.deco { z-index: 2; } .ly-i.build { z-index: 1; }
 .ly-i.drag { cursor: grabbing; z-index: 5; opacity: .85; box-shadow: 0 6px 18px rgba(0,0,0,.45); }

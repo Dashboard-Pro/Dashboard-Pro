@@ -18,9 +18,9 @@ function wRace() {
   const rows = d.race.slice(0, S.raceTop);
   const meRow = me && mine ? `<div class="kstrip">
       ${Kcell("Tu puesto", `#${fmt(mine.rank, 0)}`, `de ${fmt(d.farms, 0)} granjas activas`, "sun")}
-      ${Kcell("Tú", `${me.metrics.expansions}<small>/ ${isleCap(me.island)}</small>`, `isla ${ISLE_ES_ALL[me.island] || me.island}`)}
-      ${Kcell("Al líder", lead.island === me.island ? `${lead.lands - me.metrics.expansions}<small>parcelas</small>` : `isla ${ISLE_ES_ALL[lead.island] || lead.island}`, lead.island === me.island ? "" : `él va por la ${lead.lands} de esa isla`)}
-      ${Kcell("Al top 10", top10.island === me.island ? `${Math.max(0, top10.lands - me.metrics.expansions)}<small>parcelas</small>` : `isla ${ISLE_ES_ALL[top10.island] || top10.island}`, top10.island === me.island ? "" : `el 10.º está en la ${top10.lands}`)}
+      ${Kcell("Tú", `${me.metrics.expansions}<small>/ ${isleCap(me.island)}</small>`, `<span class="v-txt">isla ${ISLE_ES_ALL[me.island] || me.island}</span>`)}
+      ${Kcell("Al líder", lead.island === me.island ? `${lead.lands - me.metrics.expansions}<small>parcelas</small>` : `<span class="v-txt">isla ${ISLE_ES_ALL[lead.island] || lead.island}</span>`, lead.island === me.island ? "" : `él va por la ${lead.lands} de esa isla`)}
+      ${Kcell("Al top 10", top10.island === me.island ? `${Math.max(0, top10.lands - me.metrics.expansions)}<small>parcelas</small>` : `<span class="v-txt">isla ${ISLE_ES_ALL[top10.island] || top10.island}</span>`, top10.island === me.island ? "" : `el 10.º está en la ${top10.lands}`)}
     </div>` : "";
   return `${meRow}<div class="toolbar" style="padding:8px 12px">${SegAct([[10, "Top 10"], [25, "Top 25"], [50, "Top 50"], [100, "Top 100"]], S.raceTop, "racetop")}<span class="grow"></span><span class="ctx">obras según el volcado de anoche</span></div>
     <div class="tbl-wrap"><table class="tbl"><thead><tr><th class="r">#</th><th>Granja</th><th>Isla</th><th class="r">Parcelas</th><th>Obra</th><th class="r">Detrás del líder</th></tr></thead><tbody>
