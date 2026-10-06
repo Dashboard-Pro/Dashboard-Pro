@@ -21,7 +21,7 @@ function setLang(l) {
 // En inglés, los textos que vienen del propio juego (boosts, skills) se usan en su versión inglesa
 if (LANG === "en" && window.GAME) {
   if (window.GAME.buffsEn) window.GAME.buffs = { ...window.GAME.buffs, ...window.GAME.buffsEn };
-  for (const sk of Object.values(window.GAME.skills || {})) if (sk.buffEn) sk.buff = sk.buffEn;
+  for (const sk of Object.values(window.GAME.skills || {})) { if (sk.buffEn) sk.buff = sk.buffEn; if (sk.debuffEn) sk.debuff = sk.debuffEn; }
 }
 
 const I18N = (() => {

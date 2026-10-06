@@ -157,6 +157,7 @@ for (const m of skillBody.matchAll(/^ {2}(?:"([^"]+)"|([A-Za-z0-9_]+)):\s*{([\s\
     // Rango máximo de las skills mejorables (con Ascension Shards), tengan o no valores numéricos por rango
     maxLevel: Number(get(/upgrade:\s*{\s*maxLevel:\s*(\d+)/)) || undefined,
     debuff: tr(get(/debuff:\s*{[\s\S]*?shortDescription:\s*translate\("([^"]+)"\)/)) || get(/debuff:\s*{[\s\S]*?shortDescription:\s*"([^"]+)"/) || undefined,
+    debuffEn: dictEn[get(/debuff:\s*{[\s\S]*?shortDescription:\s*translate\("([^"]+)"\)/)] || get(/debuff:\s*{[\s\S]*?shortDescription:\s*"([^"]+)"/) || undefined,
   };
 }
 const tierBody = block(read("events/landExpansion/choseSkill.ts"), "SKILL_POINTS_PER_TIER");

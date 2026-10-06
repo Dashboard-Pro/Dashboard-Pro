@@ -36,5 +36,13 @@
 "deja {0} FLOWER ({1} tickets a {2}){3}":"leaves {0} FLOWER ({1} tickets at {2}){3}",
 "deja {0} FLOWER{1}":"leaves {0} FLOWER{1}",
 "y {0} más":"and {0} more",
-"Ya aplicado:":"Already applied:"
+"Ya aplicado:":"Already applied:",
+"flor de la semana":"flower of the week",
+"en curso":"in progress",
+"+{0} por VIP +{1} por tus boosts":"+{0} for VIP +{1} from your boosts",
+"+{0} por VIP":"+{0} for VIP",
+"animal nivel {0}":"level {0} animal",
+"Coste / u":"Cost / unit",
+"flor de la semana · floristería":"flower of the week · flower shop",
+"Volumen 7 d":"Volume 7 d"
 }
