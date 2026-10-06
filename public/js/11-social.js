@@ -418,7 +418,7 @@ function wFriendCompare() {
         <td class="r ${diff > 0 ? "up" : diff < 0 ? "down" : "faint"}">${diff === 0 ? "=" : `${diff > 0 ? "+" : "−"}${val(k, Math.abs(diff))}`}</td>
         <td class="r dim">${topText(me.row.pct[k])}</td><td class="r dim">${topText(f.row.pct[k])}</td></tr>`;
     }).join("")}
-  </tbody></table></div><div class="mod-f"><span>Diferencia: verde = vas por delante</span><span>${esc(f.name)}: ${esc(islandLabel(f.row.island))} · ${bandLabel(f.row.band)}${f.row.faction ? ` · ${esc(f.row.faction)}` : ""}</span></div>`;
+  </tbody></table></div><div class="mod-f"><span>Diferencia: verde = vas por delante</span><span>${esc(f.name)} · isla ${esc(islandLabel(f.row.island))} · ${bandLabel(f.row.band)}${f.row.faction ? ` · ${esc(f.row.faction)}` : ""}</span></div>`;
 }
 function wFriendBoosts() {
   const { f, me } = selectedFriend();
@@ -435,7 +435,7 @@ function wFriendBoosts() {
   return `${theirs.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Lo tiene y tú no</th><th class="r">Precio</th></tr></thead><tbody>
     ${theirs.slice(0, 25).map((r) => `<tr ${link(r.n) ? `data-open="${link(r.n)}"` : ""}><td class="w">${Gi(r.n, 14)} ${esc(r.n)}<div class="ctx cm-desc">${esc(txt(r.n))}</div></td><td class="r dim">${r.p != null ? `${fmt(r.p, r.p < 10 ? 2 : 0)} FLW` : "—"}</td></tr>`).join("")}
   </tbody></table></div>` : Empty("check", "Nada que envidiar", `Tienes todos los boosts de ${esc(f.name)}.`)}
-    ${onlyMine.length ? `<div class="mod-f" style="display:block"><span>Tú tienes y ${esc(f.name)} no: ${esc(onlyMine.slice(0, 12).join(", "))}${onlyMine.length > 12 ? ` y ${onlyMine.length - 12} más` : ""}</span></div>` : ""}`;
+    ${onlyMine.length ? `<div class="mod-f" style="display:block"><span>Tú tienes y ${esc(f.name)} no: <span>${esc(onlyMine.slice(0, 12).join(", "))}</span>${onlyMine.length > 12 ? ` y ${onlyMine.length - 12} más` : ""}</span></div>` : ""}`;
 }
 async function friendAdd(q) {
   q = String(q || "").trim();

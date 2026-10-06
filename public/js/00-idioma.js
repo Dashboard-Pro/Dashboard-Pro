@@ -54,6 +54,13 @@ const I18N = (() => {
     buckets.get(key).push(t);
   }
   const cache = new Map();
+  // Texto exacto; si va en minúscula ("piedra", "otoño") y solo está con mayúscula, se usa ese y se pasa a minúscula
+  const exactOf = (key) => {
+    const v = exact.get(key);
+    if (v != null || !/^[a-záéíóúñ]/.test(key)) return v;
+    const cap = exact.get(key[0].toUpperCase() + key.slice(1));
+    return cap == null ? undefined : cap[0].toLowerCase() + cap.slice(1);
+  };
   function tpl(key) {
     const words = new Set(key.toLowerCase().match(/[a-záéíóúñü]{3,}/g) || []);
     // La parte fija tiene que pesar en el texto ("{0} de {1}" no vale para "Pepe de Granja"), salvo que lo que va en los
@@ -84,15 +91,19 @@ const I18N = (() => {
     let out = cache.get(spaced);
     if (out === undefined) {
       // Plantillas sobre el texto con sus espacios de los bordes: si delante iba un icono, el texto empieza por espacio
-      out = exact.get(key) ?? tpl(spaced)?.trim() ?? null;
+      out = exactOf(key) ?? tpl(spaced)?.trim() ?? null;
       // Frases unidas con " · " o ": ": cada trozo por separado
       // Un número delante o detrás de una palabra conocida: "Básico 11", "1 fácil"
       if (out == null) {
         const NUM = /^[\d.,%×+−-]+$/;
         const m = key.match(/^([\d.,%×+−-]+) (.+)$/) || key.match(/^(.+) ([\d.,%×+−-]+)$/);
-        if (m) { const a = NUM.test(m[1]) ? 2 : 1, w = exact.get(m[a]); if (w) out = a === 2 ? `${m[1]} ${w}` : `${w} ${m[2]}`; }
+        if (m) { const a = NUM.test(m[1]) ? 2 : 1, w = exactOf(m[a]); if (w) out = a === 2 ? `${m[1]} ${w}` : `${w} ${m[2]}`; }
       }
+      // Trozo que empieza por el separador (" · Árboles" tras un icono)
+      if (out == null && /^· ./.test(key)) { const t = tr(key.slice(2)); if (t !== key.slice(2)) out = `· ${t}`; }
       if (out == null && key.includes(" · ")) { const segs = key.split(" · "), t = segs.map((s) => tr(s)); if (t.some((x, i) => x !== segs[i])) out = t.join(" · "); }
+      // Listas cortas con comas: "16 piedra, 14 árboles, 10 cultivos"
+      if (out == null && key.includes(", ")) { const segs = key.split(", "); if (segs.every((s) => s.split(" ").length <= 4)) { const t = segs.map((s) => tr(s)); if (t.some((x, i) => x !== segs[i])) out = t.join(", "); } }
       if (cache.size > 20000) cache.clear();
       cache.set(spaced, out);
     }

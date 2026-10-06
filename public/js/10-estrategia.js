@@ -753,7 +753,7 @@ function wExpNext() {
       ${Kcell("Producirlo tú", slow ? (slow.days != null ? dur(slow.days * DAY_MS) : "—") : "¡ya lo tienes!", slow ? `lo más lento: ${esc(slow.name)}` : "todos los recursos listos")}
       ${Kcell("Coins", n.coinsMiss ? `falta ${compact(n.coinsMiss)}` : "✓", `pide ${compact(n.req.coins)}`, n.coinsMiss ? "" : "up")}
       ${Kcell("Nivel", n.levelOk ? "✓" : `nv ${n.req.level}`, `construcción ${dur(n.req.seconds * 1000)}`, n.levelOk ? "up" : "")}
-    </div>${e.expBoosts.length ? `<div class="ctx exp-boosts">${sprite("bolt", 12)} Ya aplicado: ${esc(e.expBoosts.join(" · "))}</div>` : ""}${expRows(n.rows)}
+    </div>${e.expBoosts.length ? `<div class="ctx exp-boosts">${sprite("bolt", 12)} <span>Ya aplicado:</span> <span>${e.expBoosts.map((b) => `<span>${esc(b)}</span>`).join(" · ")}</span></div>` : ""}${expRows(n.rows)}
     <div class="mod-f"><span>Producirlo = días con tus nodos, sus boosts y tu ritmo de visitas · comprarlo = floor de hoy (gemas al precio de la tienda)</span></div>`;
 }
 function wExpIsland() {
