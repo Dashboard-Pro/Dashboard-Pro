@@ -155,29 +155,25 @@ function wPetKpis() {
   </div>`;
 }
 function wPetCards() {
-  const pets = petModel();
+  // Primero las que tienen algo que hacer ya: darles comida que tienes, acariciarlas, mandarlas a buscar o rescatar una descuidada
+  const pets = petModel().map((p) => {
+    const feed = p.pending.filter((f) => f.have >= 1).length, fetch = p.fetches.some((f) => f.can > 0) ? 1 : 0;
+    return { ...p, feed, fetchNow: fetch, can: feed + (p.napping ? 1 : 0) + fetch + (p.neglected ? 1 : 0) };
+  }).sort((a, b) => b.can - a.can || b.L.lvl - a.L.lvl);
   setSub("pt-list", `${pets.length} mascota${pets.length === 1 ? "" : "s"} · niveles y búsquedas según las reglas del juego`);
   if (!pets.length) return Empty("paw", "Sin mascotas", "");
-  const img = (p) => (p.nft ? Gi(`pets-${p.id}`, 48) : Gi(p.name, 48));
-  return `<div class="pet-grid">${pets.map((p) => `<div class="pet-card">
-    <div class="pet-h">${img(p)}<div><b>${esc(p.name)}</b><div class="ctx">${esc(p.type || "?")}${p.nft && p.traits ? ` · ${esc([p.traits.aura, p.traits.bib].filter(Boolean).join(" · "))}` : ""}</div></div>
-      <div class="pet-lv"><span class="eyebrow">nivel</span><b>${p.L.lvl}</b></div></div>
-    <div class="pbar" data-tip="${esc(`Nivel ${p.L.lvl}|${fmt(toNum(p.experience), 0)} XP · faltan ${fmt(p.L.toNext, 0)} para el ${p.L.lvl + 1}|`)}"><i style="width:${fmt(p.L.p * 100, 0)}%"></i></div>
-    <div class="pet-tags">
-      <span class="tag">${sprite("bolt", 11)} ${fmt(p.energy, 0)} energía</span>
-      ${p.napping ? `<span class="tag sun">acaríciala</span>` : ""}
-      ${p.neglected ? `<span class="tag red">descuidada (${p.daysSince} d sin comer)</span>` : ""}
-      <span class="tag" data-tip="Social|XP de hoy por ayuda de otros jugadores (máx. 50)|">social ${fmt(p.social, 0)}/50</span>
-    </div>
-    <h4 class="acc-h">Pide hoy</h4>
-    ${p.foods.length ? p.foods.map((f) => `<div class="bst-row${f.fed ? " on" : ""}"><span class="nm">${Gi(f.food, 14)} ${esc(f.food)}</span>
-      ${f.fed ? `<span class="tag green">dada</span>` : f.have >= 1 ? `<span class="tag sun">tienes ${fmt(f.have, 0)}</span>` : `<span class="tag">no tienes</span>`}
-      <span class="bst" style="color:var(--muted)">${f.xp ? `+${f.xp} XP` : ""}</span></div>`).join("") : `<p class="ctx">Sin peticiones</p>`}
-    <h4 class="acc-h">Puede traer</h4>
-    ${p.fetches.map((f) => `<div class="bst-row${f.open ? "" : " off"}"><span class="nm">${Gi(f.name, 14)} ${esc(f.name)}</span>
-      ${f.open ? `<span class="tag${f.can ? " green" : ""}">${f.can ? `${f.can}× ahora` : "sin energía"}</span>` : `<span class="tag">nivel ${f.level}</span>`}
-      <span class="bst" style="color:var(--muted)">${f.cost} energía${f.got ? ` · ${fmt(f.got, 0)} traídos` : ""}</span></div>`).join("")}
-  </div>`).join("")}</div>`;
+  const row = (icon, label, right, cls = "") => `<div>${Gi(icon, 22)}<span>${label}</span><b class="${cls}">${right}</b></div>`;
+  return `<div class="cb-cards">${pets.map((p) => ItemCard({ name: p.name, can: p.can,
+    iconHtml: p.nft ? Gi(`pets-${p.id}`, 48) : Gi(p.name, 48),
+    tags: `<span class="tag">nivel ${p.L.lvl}</span>${p.napping ? `<span class="tag sun">acaríciala</span>` : ""}${p.neglected ? `<span class="tag red">descuidada (${p.daysSince} d)</span>` : ""}${p.pending.length === 0 && p.foods.length ? `<span class="tag green">comida hecha</span>` : ""}`,
+    sub: `${esc(p.type || "?")}${p.nft && p.traits ? ` · ${esc([p.traits.aura, p.traits.bib].filter(Boolean).join(" · "))}` : ""} · ${fmt(toNum(p.experience), 0)} XP`,
+    body: `<div class="cb-ing">
+      ${p.foods.length ? p.foods.map((f) => row(f.food, `${f.fed ? "Dada: " : "Pide: "}${esc(f.food)}${f.xp ? ` · +${f.xp} XP` : ""}`, f.fed ? "✓" : `tienes ${fmt(f.have, 0)}`, f.fed ? "up" : f.have >= 1 ? "up" : "down")).join("") : `<div class="ctx">Sin peticiones hoy</div>`}
+      ${p.fetches.map((f) => row(f.name, `Trae ${esc(f.name)} · ${f.cost} energía${f.got ? ` · ${fmt(f.got, 0)} traídos` : ""}`, f.open ? (f.can ? `${f.can}× ahora` : "sin energía") : `nivel ${f.level}`, f.open ? (f.can ? "up" : "dim") : "dim")).join("")}
+    </div><div class="pbar" style="margin-top:10px" data-tip="${esc(`Nivel ${p.L.lvl}|${fmt(toNum(p.experience), 0)} XP · faltan ${fmt(p.L.toNext, 0)} para el ${p.L.lvl + 1}|`)}"><i style="width:${fmt(p.L.p * 100, 0)}%"></i></div>`,
+    stats: [["Energía", fmt(p.energy, 0)], ["Al nivel " + (p.L.lvl + 1), compact(p.L.toNext)], ["Social hoy", `${fmt(p.social, 0)}/50`], ["Comida", p.foods.length ? `${p.foods.length - p.pending.length}/${p.foods.length}` : "—", p.pending.length ? "" : "up"]],
+  })).join("")}</div>
+  <div class="mod-f"><span>Primero las que tienen algo que hacer ya: darles comida que tienes, acariciarlas (2 h sin mimos), mandarlas a buscar o una descuidada · en verde lo que tienes</span><span>pets.ts del juego</span></div>`;
 }
 
 /* ── Facción: rango, marks, cocina, mascota colectiva e historial ─────────── */
