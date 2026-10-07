@@ -87,7 +87,13 @@ function petTypeRef(items, id) {
   return { ...me, groups, pick, typeFloor: pick?.value ?? null };
 }
 
-// Inventario + wardrobe valorados a floor (o última venta si no hay listados).
+// Tesoros de la playa: desactivados en el marketplace (tradeable isActive=false, fuera de TRADE_LIMITS) aunque sigan
+// colgados anuncios de 2025 con su floor. Ese precio no sirve: solo se pueden vender a la tienda del juego.
+const deadMarket = (name) => G.treasureSellPrices?.[name] != null && !(name in (G.tradeResources || {}));
+// Lo que te paga la tienda por un tesoro, en FLOWER (con Treasure Map y Camel si los tienes colocados)
+const treasureShopFlw = (name) => (G.treasureSellPrices?.[name] ? (G.treasureSellPrices[name] * convBoosts("auto").treasure) / coinRate() : null);
+
+// Inventario + wardrobe valorados a floor (o última venta si no hay listados); los tesoros, a lo que paga la tienda.
 function holdings() {
   if (!has("farm") || !has("activity")) return null;
   const farm = store.farm.data.farm;
@@ -103,7 +109,13 @@ function holdings() {
   };
   const push = (name, qty, key) => {
     const it = items[key];
-    if (!it || !qty) return;
+    if (!qty) return;
+    if (deadMarket(name)) {
+      const p = treasureShopFlw(name);
+      if (p) rows.push({ name, qty, price: p, value: qty * p, prevValue: qty * p, key, bestOffer: null, liquid: qty * p, shop: true });
+      return;
+    }
+    if (!it) return;
     const price = marketFloor(it, name) ?? it.latestSale;
     if (!price) return;
     const pp = prev[key]?.floor ?? prev[key]?.latestSale;
@@ -152,7 +164,7 @@ function bestConversion(items) {
   const out = [];
   for (const [name, coins] of Object.entries(G.sellPrices || {})) {
     const it = items?.[`collectibles-${G.itemIds?.[name]}`];
-    if (!it?.floor || !coins || !(toNum(it.listingCount) > 0)) continue;
+    if (!it?.floor || !coins || !(toNum(it.listingCount) > 0) || deadMarket(name)) continue;
     out.push({ name, coins, floor: it.floor, rate: coins / it.floor, listings: toNum(it.listingCount) });
   }
   return out.sort((a, b) => b.rate - a.rate);

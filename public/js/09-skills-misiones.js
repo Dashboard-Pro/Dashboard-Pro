@@ -226,7 +226,7 @@ const NPC_ES = (n) => String(n || "").replace(/\b\w/g, (c) => c.toUpperCase());
 let marketCoinRateC = null;
 function marketCoinRate() {
   if (!has("activity")) return null;
-  // La misma que el Conversor y el chip "mejor conversión": con tus boosts de venta y contando los tesoros con listados
+  // La misma que el Conversor y el chip "mejor conversión": con tus boosts de venta (los tesoros no: no se compran en el mercado)
   const key = `${store.activity.at}|${store.farm?.at || 0}`;
   if (marketCoinRateC?.key !== key) marketCoinRateC = { key, v: convModel("auto").best?.rate || bestConversion(store.activity.data.items)[0]?.rate || null };
   return marketCoinRateC.v;
@@ -252,8 +252,9 @@ function priceBook() {
     else {
       const id = G.itemIds[name], wid = G.wearableIds[name];
       const it = a && (id != null ? a.items[`collectibles-${id}`] : wid != null ? a.items[`wearables-${wid}`] : null);
-      const mp = it ? it.floor ?? it.latestSale : null;
+      const mp = it && !deadMarket(name) ? it.floor ?? it.latestSale : null;
       if (mp) { v = mp; src = "mercado"; }
+      else if (deadMarket(name)) { v = treasureShopFlw(name); src = v != null ? "tienda" : null; }
       else if (G.recipes[name] && depth < 4) {
         const r = G.recipes[name];
         let sum = r.coins / coinRate(), ok = true;

@@ -213,6 +213,7 @@ ok(G.skillUpgradePoints?.[1] === 1 && G.skillUpgradePoints[3] === 6 && G.skills?
 ok(G.skills?.["Nom Nom"]?.ranks?.length === 3 && G.skills["Betty's Friend"].ranks[0] > 0, "valores por nivel de las skills (boosts de entrega)");
 ok(Object.keys(G.itemDims || {}).length > 300 && G.itemDims["Hen House"]?.[0] > 1, "tamaño de edificios y decoración (mapa)");
 ok(G.chests?.BASIC_REWARDS?.length > 10 && G.chests.LUXURY_REWARDS?.every((r) => r.weighting > 0) && G.chests.BASIC_REWARDS.some((r) => r.items?.Gem > 0), "premios y pesos de los cofres");
+ok(Object.keys(G.treasureSellPrices || {}).length > 10 && Object.keys(G.treasureSellPrices).every((n) => !(n in (G.tradeResources || {}))) && Object.keys(G.sellPrices || {}).some((n) => n in G.tradeResources), "tesoros fuera del marketplace (solo tienda) y cultivos comerciables: base del conversor");
 ok(Object.keys(G.fishing?.fish || {}).length > 40 && G.fishing.fish.Anchovy?.baits?.length && G.fishing.chum?.Sunflower > 0 && G.fishing.limit > 0, "peces, cebos y engodo");
 const t = Date.now();
 const chapter = Object.entries(G.chapters).find(([, c]) => t >= c.start && t < c.end)?.[0];
