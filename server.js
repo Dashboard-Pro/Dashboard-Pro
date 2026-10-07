@@ -1207,10 +1207,28 @@ const server = http.createServer((req, res) => {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// start.bat / start.command (SFL_OPEN_BROWSER=1): el navegador se abre cuando el servidor ya escucha; antes se abría
+// antes de tiempo y salía "no hay conexión"
+function openBrowser(u) {
+  if (process.env.SFL_OPEN_BROWSER !== "1" || CLOUD) return;
+  const { spawn: sp } = require("node:child_process");
+  const [cmd, args] = process.platform === "win32" ? ["cmd", ["/c", "start", "", u]] : process.platform === "darwin" ? ["open", [u]] : ["xdg-open", [u]];
+  try { sp(cmd, args, { stdio: "ignore", detached: true }).unref(); } catch { /* sin navegador: se abre a mano */ }
+}
+server.on("error", (e) => {
+  if (e.code !== "EADDRINUSE" || CLOUD) throw e;
+  // El puerto ya está ocupado: casi siempre es el dashboard abierto en otra ventana → solo abrimos la pestaña
+  console.log(`\n  El puerto ${config.port} ya está en uso: seguramente el dashboard ya está abierto en otra ventana.`);
+  console.log(`  Abriendo http://localhost:${config.port} … (si no carga, cierra el otro programa que use ese puerto)\n`);
+  openBrowser(`http://localhost:${config.port}`);
+  setTimeout(() => process.exit(0), 500);
+});
+
 // Local: solo escucha en 127.0.0.1 (la key no queda expuesta a tu red). Nube: en todas las interfaces,
 // detrás del proxy HTTPS del alojamiento.
 server.listen(config.port, CLOUD ? process.env.HOST || "0.0.0.0" : "127.0.0.1", () => {
   console.log(`\n  🌻 SFL Dashboard${CLOUD ? " (nube)" : ""} → ${CLOUD ? CLOUD_URL : `http://localhost:${config.port}`}\n`);
+  openBrowser(`http://localhost:${config.port}`);
   if (!config.apiKey) console.log(CLOUD ? "  (falta SFL_API_KEY del administrador)\n" : "  (sin API key: pégala en Ajustes dentro del dashboard)\n");
   if (CLOUD) {
     const c = cloud.info();

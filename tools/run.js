@@ -7,7 +7,8 @@ const RESTART_CODE = 42;
 function start() {
   const child = spawn(process.execPath, [path.join(__dirname, "..", "server.js"), ...process.argv.slice(2)], { stdio: "inherit" });
   child.on("exit", (code, signal) => {
-    if (code === RESTART_CODE) { console.log("  Reiniciando con la versión nueva…\n"); return start(); }
+    // Tras una actualización no se vuelve a abrir otra pestaña (la que había se recarga sola)
+    if (code === RESTART_CODE) { console.log("  Reiniciando con la versión nueva…\n"); delete process.env.SFL_OPEN_BROWSER; return start(); }
     process.exit(code ?? (signal ? 1 : 0));
   });
   for (const s of ["SIGINT", "SIGTERM"]) process.once(s, () => child.kill(s));
