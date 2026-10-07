@@ -517,6 +517,37 @@ async function cloudChecks(localPost, localFarm) {
     }
     ok((await fetch(`http://127.0.0.1:${MOCK}/world/_leak`).then((r) => r.json())).leaked === false, "la API key nunca se envía a sfl.world ni al CDN del volcado");
 
+    section("Sin sfl.world (datos oficiales y copia guardada)");
+    {
+      const dv = await fetch(`${base}/api/ext/deliveries`);
+      const dj = await dv.json();
+      const betty = dj.npcs?.find((n) => n.npc === "betty"), grim = dj.npcs?.find((n) => n.npc === "grimbly");
+      ok(dv.headers.get("x-cache") === "dump" && dj.source === "dump" && betty?.kind === "COINS" && betty.orders[0].n === 4 && grim?.kind === "FLOWER" && Math.abs(grim.avg - 0.3875) < 1e-6, "pedidos de NPCs del volcado oficial (no de sfl.world)");
+      const u = await fetch(`${base}/api/ext/user/THBD_demo`);
+      ok(u.headers.get("x-cache") === "dump" && (await u.json()).farm_id === 121500, "buscar por nombre con el índice del volcado");
+      ok(fs.existsSync(path.join(tmp, "data", "ext-cache", "ext_nfts_.json")), "copia en disco de lo último bueno de sfl.world");
+      // Otro servidor con los mismos datos y sfl.world caído (puerto cerrado): sirve la copia guardada; el cambio de
+      // moneda sin copia tira de la reserva (CoinGecko simulado)
+      const P2 = 4201; // 4198 es el de la nube
+      const c2 = spawn(process.execPath, [path.join(__dirname, "..", "server.js")], {
+        env: { ...process.env, PORT: String(P2), SFL_API_KEY: "sfl.demo", SFL_FARM_ID: "29411", SFL_MIN_GAP_MS: "150", SFL_GAMEDATA_AUTO: "0",
+          SFL_UPSTREAM: `http://127.0.0.1:${MOCK}/community`, SFL_WORLD: "http://127.0.0.1:9/api", SFL_COINGECKO: `http://127.0.0.1:${MOCK}/coingecko`,
+          SFL_DUMP_CDN: `http://127.0.0.1:${MOCK}/cdn`, SFL_CONFIG: path.join(tmp, "config.json"), SFL_DATA_DIR: path.join(tmp, "data") },
+        stdio: "ignore",
+      });
+      try {
+        let up = false;
+        for (let i = 0; i < 50 && !up; i++) { up = await fetch(`http://127.0.0.1:${P2}/api/status`).then(() => true, () => false); if (!up) await new Promise((r) => setTimeout(r, 100)); }
+        const n2 = await fetch(`http://127.0.0.1:${P2}/api/ext/nfts`);
+        ok(n2.status === 200 && ["hit", "stale"].includes(n2.headers.get("x-cache")) && (await n2.json()).collectibles?.length > 0, "sfl.world caído: sirve la copia guardada aunque se reinicie");
+        fs.rmSync(path.join(tmp, "data", "ext-cache", "ext_exchange_.json"), { force: true });
+        const fx2 = await fetch(`http://127.0.0.1:${P2}/api/ext/exchange`);
+        const fj = await fx2.json();
+        ok(fx2.headers.get("x-cache") === "fallback" && fj.sfl?.usd === 0.16 && fj.gems?.["650"]?.sfl > 0, "sfl.world caído y sin copia: FLOWER en $/€ y gemas de reserva");
+        ok((await fetch(`http://127.0.0.1:${P2}/api/ext/crafting`)).status === 200, "recetas de la Crafting Box desde la copia guardada");
+      } finally { c2.kill(); }
+    }
+
     section("Patrimonio día a día");
     {
       const jp = (p, b) => req(p, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(b) });

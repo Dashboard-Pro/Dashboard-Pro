@@ -122,8 +122,7 @@ function pcFarmCells(p, farm, error) {
     + cell("Expansiones", fmt(toNum(farm.inventory?.["Basic Land"]), 0))
     + cell("Isla", esc(ISLAS[t] || t || "—"));
 }
-// Tras cargar su granja: foto si el jugador no venía de un ranking (búsqueda por nombre) y, de
-// sfl.world, desde cuándo juega y sus marks/cheer. Todo opcional: si falla, la ficha queda igual.
+// Tras cargar su granja: foto si el jugador no venía de un ranking (búsqueda por nombre), desde cuándo juega y sus marks/cheer.
 async function pcFillExtra(p, farm, nftId) {
   const id = String(p.id);
   const card = $("#playerCard");
@@ -134,17 +133,16 @@ async function pcFillExtra(p, farm, nftId) {
     if (url && ph) { ph.classList.remove("fallback"); ph.insertAdjacentHTML("afterbegin", `<img src="${esc(url)}" alt="Bumpkin de ${esc(p.name)}" width="160" height="160" onerror="this.parentElement.classList.add('fallback');this.remove()"/>`); }
   }
   if (!p.name && farm?.username && current()) { const n = card.querySelector("#pcName"); if (n) n.textContent = farm.username; }
-  try {
-    const w = await api(`/api/ext/land/${encodeURIComponent(nftId ?? id)}`);
-    const l = w.land || {};
-    const cells = [
-      l.created ? `<div class="wide"><span>Juega desde</span><b>${esc(new Date(l.created + "T00:00:00Z").toLocaleDateString(LOCALE, { month: "short", year: "numeric" }))}</b></div>` : "",
-      l.marks != null ? `<div><span>Marks</span><b>${fmt(toNum(l.marks), 0)}</b></div>` : "",
-      l.cheer != null ? `<div><span>Cheer</span><b>${fmt(toNum(l.cheer), 0)}</b></div>` : "",
-    ].join("");
-    const el = $("#pcFarm");
-    if (cells && el && current() && !el.querySelector(".wide")) el.insertAdjacentHTML("beforeend", cells);
-  } catch { /* sfl.world no disponible o granja aún no indexada */ }
+  // Desde cuándo juega, marks y cheer: de la propia granja (API oficial)
+  if (!farm) return;
+  const created = toNum(farm.createdAt);
+  const cells = [
+    created ? `<div class="wide"><span>Juega desde</span><b>${esc(new Date(created).toLocaleDateString(LOCALE, { month: "short", year: "numeric" }))}</b></div>` : "",
+    farm.inventory?.Mark != null ? `<div><span>Marks</span><b>${fmt(toNum(farm.inventory.Mark), 0)}</b></div>` : "",
+    farm.inventory?.Cheer != null ? `<div><span>Cheer</span><b>${fmt(toNum(farm.inventory.Cheer), 0)}</b></div>` : "",
+  ].join("");
+  const el = $("#pcFarm");
+  if (cells && el && current() && !el.querySelector(".wide")) el.insertAdjacentHTML("beforeend", cells);
 }
 async function loadPlayerFarm(p) {
   const id = String(p.id);

@@ -301,7 +301,7 @@ const PAGES = {
           <div class="mod-b flush" id="ev-hist"></div>
         </section>
       </div>`;
-    mount("ev-hist", { deps: ["worldAuctions"], soft: ["farm"], render: wAuctionHistory, loading: "rows" });
+    mount("ev-hist", { soft: ["worldAuctions", "auctions", "farm"], render: wAuctionHistory, loading: "rows" });
     mount("ev-auctions", { deps: ["auctions"], render: wAuctions, loading: "rows" });
     mount("ev-raffles", { deps: ["raffles"], render: wRaffles, loading: "rows" });
     mount("ev-discord", { deps: ["discord"], render: wDiscord, loading: "rows" });

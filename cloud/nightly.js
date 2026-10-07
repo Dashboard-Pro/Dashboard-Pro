@@ -158,6 +158,12 @@ function createNightly({ dataDir, publicDir, fetchData, getConfig, log = () => {
       // Carrera de expansiones: isla (por orden, ascendidas después) y parcelas; se guardan las 100 primeras y tu puesto
       const raceScores = [], race = [];
       const streaks = { active: 0, 7: 0, 14: 0, 30: 0, 60: 0, 100: 0 }, ascension = {};
+      // Pedidos de entrega de todas las granjas (los de los últimos 21 días con recompensa): qué puede pedir cada NPC y
+      // cuánto da de media. Es la fuente oficial de Guías → Entregas de NPCs y de "uno nuevo" en Misiones.
+      const orderMap = {}; // npc → { kind, sigs: { "items" → { items, sum, n } } }
+      const ORDER_DAYS = 21 * 86400_000;
+      // Nombre de usuario → granja (buscador de jugadores sin depender de sfl.world)
+      const names = {};
 
       state.phase = "descargando";
       // Sin cabeceras: el CDN es público y la key nunca sale de la API oficial
@@ -194,6 +200,20 @@ function createNightly({ dataDir, publicDir, fetchData, getConfig, log = () => {
           if (race.length > 100) race.pop();
         }
         if (asc) ascension[asc] = (ascension[asc] || 0) + 1;
+        if (f.username) names[String(f.username).toLowerCase()] = o.nftId != null && o.nftId !== o.id ? [o.id, o.nftId] : o.id;
+        for (const od of f.delivery?.orders || []) {
+          if (!od?.from || now - num(od.createdAt) > ORDER_DAYS || !od.items || "sfl" in od.items) continue;
+          const rw = od.reward || {}, npc = String(od.from).toLowerCase();
+          // Los de tickets llegan sin recompensa: el juego la calcula al entregar (base del NPC, ticketRewards)
+          const tk = num(rw.items?.tickets ?? rw.tickets) || num(G.ticketRewards?.[npc]);
+          const kind = num(rw.sfl) > 0 ? "FLOWER" : num(rw.coins) > 0 ? "COINS" : tk > 0 ? "TICKETS" : null;
+          if (!kind) continue;
+          const val = kind === "FLOWER" ? num(rw.sfl) : kind === "COINS" ? num(rw.coins) : tk;
+          const e = (orderMap[npc] ||= { kind, sigs: {} });
+          const sig = Object.keys(od.items).sort().map((k) => `${k}:${num(od.items[k])}`).join("|");
+          const s = (e.sigs[sig] ||= { items: od.items, sum: 0, n: 0 });
+          s.sum += val; s.n++;
+        }
         const st = num(f.desert?.digging?.streak?.count);
         if (st > 0) { streaks.active++; for (const b of [7, 14, 30, 60, 100]) if (st >= b) streaks[b]++; }
 
@@ -247,6 +267,12 @@ function createNightly({ dataDir, publicDir, fetchData, getConfig, log = () => {
           boosts: Object.fromEntries(Object.entries(g.boosts).filter(([, c]) => c / g.n >= MIN_SHARE).sort((a, b) => b[1] - a[1]).slice(0, 80)),
         }])),
         items, wearables, streaks, ascension,
+        // Mismo formato que /api/ext/deliveries (sfl.world): { npcs: [{ npc, kind, avg, orders: [{ items, reward, n }] }] }
+        deliveries: Object.entries(orderMap).map(([npc, e]) => {
+          const orders = Object.values(e.sigs).filter((s) => s.n >= 2).map((s) => ({ items: s.items, reward: Number((s.sum / s.n).toFixed(4)), n: s.n })).sort((a, b) => b.n - a.n);
+          const tot = orders.reduce((a, o) => a + o.n, 0);
+          return { npc, kind: e.kind, avg: tot ? Number((orders.reduce((a, o) => a + o.reward * o.n, 0) / tot).toFixed(4)) : null, orders };
+        }).filter((x) => x.orders.length),
         race: race.map(({ score, ...r }) => r),
         raceMine: mine ? (() => { const sc = (ISLE_RANK[mine.island] ?? 0) * 1000 + mine.metrics.expansions; return { rank: raceScores.filter((x) => x > sc).length + 1, score: sc }; })() : null,
         me: mine && ranked(mine),
@@ -254,6 +280,8 @@ function createNightly({ dataDir, publicDir, fetchData, getConfig, log = () => {
       };
       fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(path.join(dir, `${date}.json`), JSON.stringify(out));
+      // El índice de nombres (~3 MB) va aparte y fuera del repo (data/ext-cache), solo el último
+      try { fs.mkdirSync(path.join(dataDir, "ext-cache"), { recursive: true }); fs.writeFileSync(path.join(dataDir, "ext-cache", "names.json"), JSON.stringify({ date, names })); } catch { /* opcional */ }
       // Se guardan 60 días de resúmenes (~150 KB cada uno)
       for (const old of files().slice(0, -60)) fs.rmSync(path.join(dir, old), { force: true });
       state.lastRunAt = Date.now();
@@ -302,7 +330,19 @@ function createNightly({ dataDir, publicDir, fetchData, getConfig, log = () => {
     return metricsOf(farm, { G, ...prices(G), nftSet: new Set(G.nftCollectibles || []) });
   }
 
-  return { ingest, status, summary, history, liveMetrics };
+  // Granja de un nombre de usuario según el último volcado (null si no está)
+  let namesMemo = null;
+  function farmOfName(name) {
+    const file = path.join(dataDir, "ext-cache", "names.json");
+    try {
+      const st = fs.statSync(file);
+      if (namesMemo?.mtime !== st.mtimeMs) namesMemo = { mtime: st.mtimeMs, ...JSON.parse(fs.readFileSync(file, "utf8")) };
+    } catch { return null; }
+    const id = namesMemo.names?.[String(name).trim().toLowerCase()];
+    return id == null ? null : { farm_id: Array.isArray(id) ? id[0] : id, nft_id: Array.isArray(id) ? id[1] : id, source: "dump", date: namesMemo.date };
+  }
+
+  return { ingest, status, summary, history, liveMetrics, farmOfName };
 }
 
 module.exports = { createNightly, metricsOf, METRICS };

@@ -68,6 +68,8 @@ function setApiDown(down, msg) {
 
 const store = {};
 const has = (k) => store[k]?.data !== undefined;
+// Falló la carga y no hay datos (para no dejar un "cargando…" para siempre si una fuente externa no responde)
+const loadFailed = (k) => !has(k) && Boolean(store[k]?.error);
 function load(name, fn, maxAge) {
   const s = (store[name] ||= {});
   if (s.data !== undefined && (!maxAge || now() - s.at < maxAge)) return Promise.resolve(s.data);
@@ -127,7 +129,14 @@ const LOADERS = {
     load("resourceHist", () => api(`/api/prices?keys=${encodeURIComponent(resourceKeys().join(","))}`), 600_000)),
   // sfl.world (comunidad, sin key). Si falla, lo que depende de ello simplemente no se muestra.
   worldNfts: () => load("worldNfts", async () => {
-    const d = await api("/api/ext/nfts");
+    // Sin sfl.world: suministro del volcado nocturno oficial (unidades en granjas activas) y boost = texto del juego
+    const d = await api("/api/ext/nfts").catch(async (e) => {
+      const dump = await LOADERS.dump().catch(() => null);
+      if (!dump?.items) throw e;
+      const row = (collection, ids, src) => Object.entries(ids || {}).map(([name, id]) => ({ collection, id, name, supply: src[name]?.[0] || null,
+        have_boost: G.buffs?.[name] ? 1 : 0, boost_text: [].concat(G.buffs?.[name] || []).join(" · ") }));
+      return { collectibles: row("collectibles", G.itemIds, dump.items), wearables: row("wearables", G.wearableIds, dump.wearables || {}), updatedAt: dump.date, source: "dump" };
+    });
     const map = {};
     for (const x of [...(d.collectibles || []), ...(d.wearables || [])]) {
       map[`${x.collection}-${x.id}`] = { supply: x.supply || null, boost: x.have_boost ? String(x.boost_text || "").trim() : "" };

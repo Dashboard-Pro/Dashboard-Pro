@@ -270,6 +270,9 @@ function dumpGz() {
     inventory: { "Basic Land": String(Math.round(lvl / 5)), Wood: String(lvl * 10), Gem: "5", ...extra.inventory },
     wardrobe: extra.wardrobe || {}, trees: Object.fromEntries(Array.from({ length: Math.round(lvl / 5) }, (_, i) => [i, { x: i }])),
     faction: { name: island === "desert" ? "goblins" : "bumpkins" },
+    // Pedidos de entrega: el volcado los junta en "qué pide cada NPC" (Guías → Entregas de NPCs sin sfl.world)
+    delivery: { orders: [{ id: `d${id}`, from: "betty", createdAt: t0 - H, items: { Wheat: 30, Kale: 20 }, reward: { coins: 600 + id } },
+      { id: `e${id}`, from: "grimbly", createdAt: t0 - H, items: { "Boiled Eggs": 1 }, reward: { sfl: 0.4 } }] },
   } });
   const lines = [
     { id: 121500, nftId: 29411, lastActivity: t0 - H, farm: farm() },
@@ -342,6 +345,12 @@ http.createServer((req, res) => {
     const gz = dumpGz();
     res.writeHead(200, { "content-type": "application/gzip", "content-length": gz.length });
     return res.end(gz);
+  }
+  // CoinGecko simulado: reserva del precio de FLOWER cuando sfl.world no responde
+  if (url.pathname === "/coingecko/simple/price") {
+    if (req.headers["x-api-key"]) worldLeakedKey = true;
+    res.writeHead(200, { "content-type": "application/json" });
+    return res.end(JSON.stringify({ "flower-2": { usd: 0.16, eur: 0.14 } }));
   }
   if (url.pathname.startsWith("/opensea/")) {
     if (String(req.headers["x-api-key"] || "").startsWith("sfl.")) worldLeakedKey = true;

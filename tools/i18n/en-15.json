@@ -1,0 +1,17 @@
+{
+"Cada puja":"Each bid",
+"Cruces sin cargar: sfl.world no responde":"Crosses not loaded: sfl.world isn't responding",
+"Las recetas de la Crafting Box solo las publica sfl.world (el juego no) y ahora no responde. En cuanto cargue una vez, se guardan y ya no dependerán de que esté en marcha.":"Crafting Box recipes are only published by sfl.world (not by the game) and it isn't responding right now. Once they load, they're saved and won't depend on it being up.",
+"Los pedidos de cada NPC salen del volcado nocturno oficial (actívalo en Comunidad) o, si aún no hay, de sfl.world, que no responde. Vuelve a probar en un rato.":"Each NPC's orders come from the official nightly dump (turn it on in Community) or, until there is one, from sfl.world, which isn't responding. Try again in a while.",
+"Ni sfl.world ni la API oficial responden ahora mismo.":"Neither sfl.world nor the official API is responding right now.",
+"No hay ninguna granja llamada «{0}» (las granjas de hoy aparecen al día siguiente)":"There's no farm called «{0}» (today's farms show up the next day)",
+"No hay ninguna granja llamada «{0}» (las granjas de hoy aparecen al día siguiente): prueba con su ID":"There's no farm called «{0}» (today's farms show up the next day): try its ID",
+"No se pudo buscar por nombre ahora mismo: prueba con el número de la granja":"Couldn't search by name right now: try the farm number",
+"No se pudo buscar por nombre ahora mismo: prueba con su ID":"Couldn't search by name right now: try its ID",
+"Primero lo que conviene hacer ya · entregar = recompensa (tickets al valor del ticket en la tienda de Stella) − lo que valen los items; saltar es gratis desde el día siguiente y trae otro pedido del mismo NPC (\"Uno nuevo\" = lo que deja de media, con los pedidos de todas las granjas del volcado oficial) · valor = lo que ganarías vendiendo esos items{0}; herramientas y comidas por receta; coins a {1}/FLOWER · la recompensa lleva tus boosts y la entrega doble":"What's worth doing now first · deliver = reward (tickets at the ticket's value in Stella's shop) − what the items are worth; skipping is free from the next day and brings another order from the same NPC (\"A new one\" = what it leaves on average, from every farm's orders in the official dump) · value = what you'd get selling those items{0}; tools and food by recipe; coins at {1}/FLOWER · the reward includes your boosts and the double delivery",
+"Sin recetas de cruce: sfl.world no responde ahora mismo.":"No cross recipes: sfl.world isn't responding right now.",
+"pedidos de las granjas activas en el volcado oficial del {0} (los de los últimos 21 días; recompensa = la media)":"orders from active farms in the official dump of {0} (from the last 21 days; reward = the average)",
+"{0} subastas terminadas · sfl.world no responde: pulsa una para ver su clasificación (API oficial)":"{0} finished auctions · sfl.world isn't responding: click one to see its leaderboard (official API)",
+"sfl.world no responde: sin recetas de cruce por ahora":"sfl.world isn't responding: no cross recipes for now",
+"· sfl.world no responde: sin recetas de cruce por ahora":"· sfl.world isn't responding: no cross recipes for now"
+}

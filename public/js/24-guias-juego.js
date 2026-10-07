@@ -8,7 +8,7 @@ function costFlw(items = {}, coins = 0) {
   let v = coins ? coins / coinRate() : 0;
   const unknown = [];
   for (const [n, q] of Object.entries(items)) {
-    const p = n === "Gem" ? flowerPerGem() : gPrice(n);
+    const p = n === "Gem" ? flowerPerGem() : /^coins$/i.test(n) ? 1 / coinRate() : gPrice(n);
     if (p == null) unknown.push(n); else v += p * q;
   }
   return { v, unknown, ok: !unknown.length };
@@ -129,7 +129,7 @@ function craftBoxModel() {
 }
 function wGuideCraft() {
   const d = craftBoxModel();
-  if (!d.loaded || !d.rows.length) return Empty("hammer", "Sin recetas", "Las recetas de la Crafting Box salen de sfl.world y no han cargado. Vuelve a probar en un rato.");
+  if (!d.loaded || !d.rows.length) return Empty("hammer", "Sin recetas", "Las recetas de la Crafting Box solo las publica sfl.world (el juego no) y ahora no responde. En cuanto cargue una vez, se guardan y ya no dependerán de que esté en marcha.");
   const grp = d.rows.some((g) => g.name === S.gcraftGrp) ? S.gcraftGrp : "";
   const list = d.rows.filter((g) => !grp || g.name === grp);
   const grid = (r) => `<div class="cb-grid">${r.grid.map((n) => `<span${n ? ` data-tip="${esc(n)}||"` : ""}>${n ? Gi(n, 28) : ""}</span>`).join("")}</div>`;
@@ -489,11 +489,11 @@ function npcGuideModel() {
     const level = G.npcDeliveryLevels?.[n.npc] ?? null;
     return { ...n, orders, avgCost, rewardFlw, level, locked: lvl != null && level != null && lvl < level, done: farm ? toNum(farm.npcs?.[n.npc]?.deliveryCount) : 0 };
   });
-  return { npcs, updated: d?.updated || null, loaded: Boolean(d) };
+  return { npcs, updated: d?.updated || null, source: d?.source || "sfl.world", loaded: Boolean(d) };
 }
 function wGuideNpc() {
   const d = npcGuideModel();
-  if (!d.loaded) return Empty("scroll", "Sin datos", "Los pedidos de cada NPC salen de sfl.world y no han cargado. Vuelve a probar en un rato.");
+  if (!d.loaded) return Empty("scroll", "Sin datos", "Los pedidos de cada NPC salen del volcado nocturno oficial (actívalo en Comunidad) o, si aún no hay, de sfl.world, que no responde. Vuelve a probar en un rato.");
   const kinds = [...new Set(d.npcs.map((n) => n.kind))];
   const list = d.npcs.filter((n) => S.gnKind === "all" || n.kind === S.gnKind).sort((a, b) => (a.level ?? 0) - (b.level ?? 0));
   const tk = G.chapterTickets?.[currentChapter()] || "tickets";
@@ -505,7 +505,7 @@ function wGuideNpc() {
         sub: `da de media ${rewardTxt(n, n.avg)}${n.kind === "COINS" && n.rewardFlw != null ? ` (${fmt(n.rewardFlw, 3)} FLW)` : ""} · ${n.orders.length} pedidos posibles`,
         body: `<div class="cb-ing">${n.orders.slice().sort((a, b) => Number(Object.entries(b.items || {}).every(([k, q]) => haveOf(k) >= q)) - Number(Object.entries(a.items || {}).every(([k, q]) => haveOf(k) >= q)) || (a.c.v || 0) - (b.c.v || 0)).slice(0, 5).map((o) => { const ok = gFarm() && Object.entries(o.items || {}).every(([k, q]) => haveOf(k) >= q); return `<div>${Gi(Object.keys(o.items || {})[0], 22)}<span>${itemsTxt(o.items, 0, 12)}</span><b class="${ok ? "up" : ""}">${costCell(o.c)}</b></div>`; }).join("")}${n.orders.length > 5 ? `<div class="faint">+${n.orders.length - 5} pedidos más</div>` : ""}</div>`,
         stats: [["Coste medio", n.avgCost == null ? "—" : fmt(n.avgCost, 3)], ["Nivel", n.level ?? "—"], ["Le has entregado", gFarm() ? fmt(n.done, 0) : "—"]] })).join("")}</div>
-    <div class="mod-f"><span>Primero los NPCs con algún pedido que ya puedes hacer · pedidos recogidos por sfl.world de todas las granjas${d.updated ? ` (actualizado hace ${esc(d.updated.replace(/ ago$/, "").replace("months", "meses").replace("month", "mes").replace("days", "días").replace("weeks", "semanas"))})` : ""} · pulsa un NPC para ver sus pedidos</span><span>Coste a floor sin tus boosts · tus pedidos de hoy, en Misiones</span></div>`;
+    <div class="mod-f"><span>Primero los NPCs con algún pedido que ya puedes hacer · ${d.source === "dump" ? `pedidos de las granjas activas en el volcado oficial del ${esc(d.updated)} (los de los últimos 21 días; recompensa = la media)` : `pedidos recogidos por sfl.world de todas las granjas${d.updated ? ` (actualizado hace ${esc(d.updated.replace(/ ago$/, "").replace("months", "meses").replace("month", "mes").replace("days", "días").replace("weeks", "semanas"))})` : ""}`} · pulsa un NPC para ver sus pedidos</span><span>Coste a floor sin tus boosts · tus pedidos de hoy, en Misiones</span></div>`;
 }
 ACTIONS.gnk = (v) => { S.gnKind = v; writeLS("gnKind", v); rerun(); };
 ACTIONS.gno = (v) => { S.gnOpen = S.gnOpen === v ? null : v; rerun(); };

@@ -191,9 +191,22 @@ async function cached(key, url, ttl) {
 // Va por su propio camino: nunca lleva tu API key y no gasta el límite de la API oficial. Se cachea
 // generosamente porque sfl.world actualiza cada 15 min–1 día; si cae, se sirve la última copia buena.
 const WORLD = process.env.SFL_WORLD || "https://sfl.world/api";
+// Si sfl.world no responde y no hay copia guardada: precio de FLOWER en CoinGecko (id flower-2 = el token del juego,
+// mismo contrato en Base/Ronin) y los paquetes de gemas de la tienda (precios en dólares del juego)
+const COINGECKO = process.env.SFL_COINGECKO || "https://api.coingecko.com/api/v3";
+const GEM_PACKS_USD = { 100: 1.29, 650: 6.49, 1350: 12.99, 2800: 25.99, 7400: 64.99, 15500: 129.99, 200000: 1299.99 };
+async function fxFallback() {
+  const r = await fetch(`${COINGECKO}/simple/price?ids=flower-2&vs_currencies=usd,eur`, { headers: { "user-agent": "SFL-Dashboard (local)" }, signal: AbortSignal.timeout(15_000) });
+  const p = r.ok ? (await r.json())?.["flower-2"] : null;
+  if (!(p?.usd > 0)) return null;
+  const base = GEM_PACKS_USD[100] / 100;
+  const gems = Object.fromEntries(Object.entries(GEM_PACKS_USD).map(([g, usd]) => [g, { gem: Number(g), usd, sfl1: Number((usd / g / p.usd).toFixed(4)),
+    sfl: Number((usd / p.usd).toFixed(4)), discount: Math.round((1 - usd / g / base) * 100) }]));
+  return { sfl: { usd: p.usd, eur: p.eur ?? null }, gems, source: "coingecko" };
+}
 const EXT = {
   nfts: { url: () => "/v1/nfts", ttl: 3600_000 }, // floor, supply y boost de cada NFT
-  exchange: { url: () => "/v1.1/exchange", ttl: 900_000 }, // FLOWER en €/$…, precio de las gemas
+  exchange: { url: () => "/v1.1/exchange", ttl: 900_000, fallback: fxFallback }, // FLOWER en €/$…, precio de las gemas
   auctions: { url: () => "/v1/auctions", ttl: 3 * 3600_000 }, // subastas pasadas con resultados
   boosts: { url: (a) => `/v1/land/${a}`, ttl: 6 * 3600_000, arg: /^\d{1,20}$/ }, // multiplicadores de una granja
   land: { url: (a) => `/v1.1/land/${a}`, ttl: 3600_000, arg: /^\d{1,20}$/ }, // resumen de una granja
@@ -260,9 +273,31 @@ function parseFlowerRecipes(html) {
   }
   return Object.keys(recipes).length ? { recipes } : null;
 }
-const extStats = { calls: 0, cacheHits: 0, lastError: null, lastOkAt: null };
+// Pedidos de NPCs del último volcado nocturno (null si no hay volcado o es de antes de guardarlos)
+let dumpDelivMemo = null;
+function dumpDeliveries() {
+  if (!nightly) return null; // en la nube no hay volcado
+  const last = nightly.status().dates.slice(-1)[0];
+  if (!last) return null;
+  if (dumpDelivMemo?.date !== last) {
+    const s = nightly.summary(last);
+    dumpDelivMemo = { date: last, data: s?.deliveries?.length ? { npcs: s.deliveries, updated: last, source: "dump", farms: s.farms, at: s.generatedAt || Date.now() } : null };
+  }
+  return dumpDelivMemo.data;
+}
+const extStats = { calls: 0, cacheHits: 0, lastError: null, lastOkAt: null, fallbacks: 0 };
+// Copia en disco de lo último bueno de sfl.world (data/ext-cache, fuera del repo): si cae, aunque se reinicie el
+// servidor, se sirve esa copia en vez de un error.
+const extFile = (key) => path.join(DATA_DIR, "ext-cache", key.replace(/[^a-z0-9_.-]/gi, "_").slice(0, 120) + ".json");
+function extDiskRead(key) {
+  try { const d = JSON.parse(fs.readFileSync(extFile(key), "utf8")); return d && d.status === 200 && typeof d.body === "string" ? d : null; } catch { return null; }
+}
+function extDiskWrite(key, entry) {
+  try { fs.mkdirSync(path.dirname(extFile(key)), { recursive: true }); fs.writeFileSync(extFile(key), JSON.stringify(entry)); } catch { /* sin disco: solo memoria */ }
+}
 async function extCached(key, url, ttl, parse) {
-  const hit = cache.get(key);
+  let hit = cache.get(key);
+  if (!hit) { hit = extDiskRead(key); if (hit) cache.set(key, hit); }
   if (hit && Date.now() - hit.at < ttl) { extStats.cacheHits++; return { ...hit, cache: "hit" }; }
   if (!inflight.has(key)) {
     inflight.set(key, (async () => {
@@ -277,8 +312,14 @@ async function extCached(key, url, ttl, parse) {
             return { status: 502, body: JSON.stringify({ error: "sfl.world cambió el formato de la página" }) };
           }
           body = JSON.stringify(out);
+        } else if (r.ok) {
+          // Caído a veces responde 200 con una página de error: eso no es una respuesta buena
+          try { JSON.parse(body); } catch {
+            extStats.lastError = { at: Date.now(), status: "formato", path: url };
+            return { status: 502, body: JSON.stringify({ error: "sfl.world no devolvió datos válidos" }) };
+          }
         }
-        if (r.ok) { extStats.lastOkAt = Date.now(); cache.set(key, { status: 200, body, at: Date.now() }); }
+        if (r.ok) { extStats.lastOkAt = Date.now(); const entry = { status: 200, body, at: Date.now() }; cache.set(key, entry); extDiskWrite(key, entry); }
         else if (r.status !== 404) extStats.lastError = { at: Date.now(), status: r.status, path: url };
         return { status: r.status, body };
       } catch {
@@ -1054,9 +1095,25 @@ async function handleApi(req, res, url) {
     let arg;
     try { arg = ext[2] === undefined ? undefined : decodeURIComponent(ext[2]).trim(); } catch { arg = null; }
     if (def.arg ? !def.arg.test(arg || "") : arg !== undefined) return send(res, 400, { error: "Parámetro inválido" });
+    // Pedidos de NPCs: primero del volcado oficial de todas las granjas (es de ayer; los de sfl.world llevan meses sin
+    // actualizarse) y, si aún no hay volcado, de sfl.world
+    if (ext[1] === "deliveries") {
+      const d = dumpDeliveries();
+      if (d) return send(res, 200, JSON.stringify(d), { "x-fetched-at": String(d.at), "x-cache": "dump" });
+    }
+    // Nombre → granja: índice del último volcado oficial (incluye jugadores de ayer; sfl.world tarda días)
+    if (ext[1] === "user" && nightly) {
+      const u = nightly.farmOfName(arg);
+      if (u) return send(res, 200, JSON.stringify({ username: arg, ...u }), { "x-fetched-at": String(Date.now()), "x-cache": "dump" });
+    }
     const key = `ext:${ext[1]}:${String(arg ?? "").toLowerCase()}`;
     const base = def.site ? WORLD.replace(/\/api\/?$/, "") : WORLD; // las páginas cuelgan de la web, no de /api
     const r = await extCached(key, base + def.url(arg), def.ttl, def.parse);
+    // Sin sfl.world ni copia guardada: fuente de reserva (si la tiene)
+    if (r.status !== 200 && r.status !== 404 && def.fallback) {
+      const fb = await def.fallback(arg).catch(() => null);
+      if (fb) { extStats.fallbacks++; return send(res, 200, JSON.stringify(fb), { "x-fetched-at": String(Date.now()), "x-cache": "fallback" }); }
+    }
     return send(res, r.status, r.body || "{}", { "x-fetched-at": String(r.at), "x-cache": r.cache });
   }
 

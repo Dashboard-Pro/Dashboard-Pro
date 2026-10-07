@@ -313,7 +313,7 @@ function wBoosts() {
         ${x.boost ? `<span class="bst">${esc(x.boost)}</span>` : ""}<span class="cd" data-until="${x.to}">${dur(x.to - t)}</span></div>`).join("")
       : `<p class="ctx">Ningún boost temporal activo (tótems, shrines, clima o eventos).</p>`}
       <h4 class="acc-h">Ropa puesta <span class="faint">(tú y tus ayudantes)</span></h4>${b.worn.length ? list(b.worn, 6) : `<p class="ctx">Nada de lo que lleváis da boost.</p>`}</div>
-    <div><h4 class="acc-h">NFTs colocados</h4>${b.placed.length ? list(b.placed, 7) : `<p class="ctx">${has("worldNfts") ? "Ninguno de tus NFTs colocados da boost." : "Cargando boosts de sfl.world…"}</p>`}
+    <div><h4 class="acc-h">NFTs colocados</h4>${b.placed.length ? list(b.placed, 7) : `<p class="ctx">Ninguno de tus NFTs colocados da boost.</p>`}
       <h4 class="acc-h">Skills</h4>${b.skills.length ? list(b.skills, 4) : `<p class="ctx">Sin skills.</p>`}</div>
     <div><h4 class="acc-h">Lo que usa la estrategia</h4>
       <dl class="kv">
@@ -921,5 +921,5 @@ function wFlowerBeds() {
   return `${beds || `<p class="ctx">No tienes macizos de flores.</p>`}
     <h4 class="acc-h">Lo siguiente que plantar</h4>
     ${queue.length ? queue.slice(0, 4).map((d, i) => `<div class="bst-row"><span class="nm">${i + 1}. ${esc(d.flower)}</span><span class="bst" style="color:var(--muted)">${esc(recipeText(d.recipe))}${d.tickets ? ` · ${fmt(d.tickets, 0)} ${esc(p.ticket)}` : ""}</span></div>`).join("")
-      : `<p class="ctx">${p.recipes ? "Nada que puedas plantar ya para lo que te piden." : "Cargando recetas de sfl.world…"}</p>`}`;
+      : `<p class="ctx">${p.recipes ? "Nada que puedas plantar ya para lo que te piden." : loadFailed("flowerRecipes") ? "Sin recetas de cruce: sfl.world no responde ahora mismo." : "Cargando recetas de sfl.world…"}</p>`}`;
 }

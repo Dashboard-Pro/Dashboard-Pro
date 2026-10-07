@@ -387,8 +387,8 @@ function wGuideFlowers() {
     return { ...f, opts, can: farm ? Math.max(0, ...opts.map((o) => o.can || 0)) : null };
   };
   const cross = (s, f) => `<div class="cb-ing">${f.opts.map((o) => `<div class="${f.best?.ing === o.ing ? "best" : ""}" title="${farm ? `tienes ${fmt(haveOf(o.ing), 0)}` : ""}">${Gi(o.ing, 22)}<span>${esc(o.ing)}${f.best?.ing === o.ing ? ` <em class="tag green">más barato</em>` : ""}</span><b class="${o.can == null ? "" : o.can ? "up" : "down"}">×${fmt(o.amt, 0)}</b></div>`).join("")
-    || `<div class="ctx">${d.hasRecipes ? "Solo sale de la semilla (sin cruce conocido)" : "Cargando cruces de sfl.world…"}</div>`}</div>`;
-  return `<div class="toolbar" style="padding:8px 12px;gap:8px;flex-wrap:wrap">${view}${seg}<span class="ctx">${d.seeds.length} semillas · ${d.total} flores${d.hasRecipes ? "" : " · cargando los cruces de sfl.world"}</span></div>
+    || `<div class="ctx">${d.hasRecipes ? "Solo sale de la semilla (sin cruce conocido)" : loadFailed("flowerRecipes") ? "Cruces sin cargar: sfl.world no responde" : "Cargando cruces de sfl.world…"}</div>`}</div>`;
+  return `<div class="toolbar" style="padding:8px 12px;gap:8px;flex-wrap:wrap">${view}${seg}<span class="ctx">${d.seeds.length} semillas · ${d.total} flores${d.hasRecipes ? "" : loadFailed("flowerRecipes") ? " · sfl.world no responde: sin recetas de cruce por ahora" : " · cargando los cruces de sfl.world"}</span></div>
     ${demand.length ? `<div class="grp">Te las piden ahora</div><div class="cb-cards">${demand.slice(0, 8).map((x) => ItemCard({ name: x.flower, can: x.have >= x.need ? 1 : 0, sub: `${esc(FLOWER_KIND[x.kind] || x.kind)} · ${esc(x.who)}`,
         body: `<div class="ctx">Piden ${fmt(x.need, 0)} · tienes <b class="${x.have >= x.need ? "up" : "down"}">${fmt(x.have, 0)}</b></div>` })).join("")}</div>
       <div class="mod-f"><span>Plan completo en Estrategia → Flores</span><a href="#strategy" class="ctx">Estrategia →</a></div>` : ""}

@@ -503,7 +503,7 @@ const needRow = (l) => `<div title="${esc(l.name)} · tienes ${fmt(l.have)}${l.u
 // Entregar, saltar o vender: entregar deja la recompensa (tickets al valor del ticket en la tienda de Stella) menos lo que
 // valen los items (lo que sacarías vendiéndolos o lo que cuesta comprar lo que falta); no entregar = quedarte los items
 // (0); saltar es gratis desde el día siguiente a que llegó el pedido (skipOrder.ts) y trae otro del mismo NPC, que de
-// media deja lo que sus pedidos posibles (sfl.world) en recompensa menos coste.
+// media deja lo que sus pedidos posibles (volcado oficial de todas las granjas) en recompensa menos coste.
 function deliveryAdvice(o) {
   if (o.done) return null;
   let tkv = null;
@@ -554,7 +554,7 @@ function wDeliveries() {
       stats: [["Valor pedido", fmt(o.net, 2)], verdict, ["Si entregas", o.adv?.profit == null ? "—" : signed(o.adv.profit, 3), o.adv?.profit == null ? "" : tone(o.adv.profit)], ["Uno nuevo", o.adv?.next == null ? "—" : signed(o.adv.next, 3), o.adv?.next == null ? "" : tone(o.adv.next)]],
     });
   }).join("")}</div>
-    <div class="mod-f"><span>Primero lo que conviene hacer ya · entregar = recompensa (tickets al valor del ticket en la tienda de Stella) − lo que valen los items; saltar es gratis desde el día siguiente y trae otro pedido del mismo NPC ("Uno nuevo" = lo que deja de media, con los pedidos de sfl.world) · valor = lo que ganarías vendiendo esos items${S.p2pTax ? ` (${taxNote()})` : ""}; herramientas y comidas por receta; coins a ${fmt(coinRate(), 0)}/FLOWER · la recompensa lleva tus boosts y la entrega doble</span>
+    <div class="mod-f"><span>Primero lo que conviene hacer ya · entregar = recompensa (tickets al valor del ticket en la tienda de Stella) − lo que valen los items; saltar es gratis desde el día siguiente y trae otro pedido del mismo NPC ("Uno nuevo" = lo que deja de media, con los pedidos de todas las granjas del volcado oficial) · valor = lo que ganarías vendiendo esos items${S.p2pTax ? ` (${taxNote()})` : ""}; herramientas y comidas por receta; coins a ${fmt(coinRate(), 0)}/FLOWER · la recompensa lleva tus boosts y la entrega doble</span>
       <span>coste/ticket en verde = por debajo de la mediana (${fmt(median, 3)})</span></div>`;
 }
 

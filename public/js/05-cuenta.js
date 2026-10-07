@@ -292,7 +292,7 @@ async function welcomeSubmit(kind) {
       $("#wlFarmBtn").disabled = true;
       $("#wlFarmBtn").textContent = "Buscando…";
       let id = q;
-      // Un nombre se traduce a número con sfl.world (sin key)
+      // Un nombre se traduce a número con el índice del volcado nocturno o, si no está, con sfl.world (sin key)
       if (!/^\d+$/.test(q) && !/^0x[0-9a-f]{40}$/i.test(q)) {
         try { id = String((await api(`/api/ext/user/${encodeURIComponent(q)}`)).farm_id); }
         catch (e) { throw new Error(e.status === 404 ? `No encuentro ninguna granja llamada «${q}». Prueba con el número (las granjas nuevas tardan unos días en aparecer por nombre).` : "No se pudo buscar por nombre ahora mismo: prueba con el número de la granja."); }

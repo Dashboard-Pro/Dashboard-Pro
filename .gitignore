@@ -9,5 +9,7 @@ node_modules/
 .DS_Store
 # Paquetes de descarga (npm run release)
 dist/
+# Copia local de lo último bueno de sfl.world (cada ordenador la suya)
+data/ext-cache/
 # Historial de cada jugador: se queda en su ordenador
 data/

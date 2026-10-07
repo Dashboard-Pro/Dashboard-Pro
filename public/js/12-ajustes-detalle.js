@@ -238,7 +238,23 @@ function bidText(a, e) {
   const parts = [e.sfl > 0 ? `${fmt(e.sfl, 0)} FLOWER` : "", ...Object.entries(e.items || {}).filter(([, v]) => v > 0).map(([k, v]) => `${fmt(v, 0)} ${k === "Gem" ? "gemas" : k}`)].filter(Boolean);
   return parts.join(" + ") || `${fmt(e.tickets, 0)} pujas`;
 }
+// Sin sfl.world: las subastas terminadas de la API oficial; la clasificación de cada una se pide al pulsarla
+function wAuctionHistoryOfficial() {
+  if (!loadFailed("worldAuctions")) return Loading("rows");
+  if (!has("auctions")) return loadFailed("auctions") ? Empty("hammer", "Sin datos", "Ni sfl.world ni la API oficial responden ahora mismo.") : Loading("rows");
+  const t = now(), q = S.auHistQ.trim().toLowerCase();
+  const all = store.auctions.data.filter((a) => a.endAt < t).sort((x, y) => y.endAt - x.endAt);
+  const list = all.filter((a) => !q || auctionPrize(a).toLowerCase().includes(q));
+  setSub("ev-hist", `${all.length} subastas terminadas · sfl.world no responde: pulsa una para ver su clasificación (API oficial)`);
+  if (!list.length) return Empty("hammer", "Sin resultados", q ? "Ninguna subasta con ese premio." : "No hay subastas terminadas.");
+  return `<div class="tbl-wrap" style="max-height:520px"><table class="tbl"><thead><tr><th>Fecha</th><th>Premio</th><th class="r">Supply</th><th class="r">Cada puja</th></tr></thead><tbody>
+    ${list.slice(0, 150).map((a) => `<tr data-auction="${esc(a.auctionId)}" style="cursor:pointer"><td class="dim">${dateShort(a.endAt)}</td>
+      <td class="w"><div class="name">${sprite(auctionIcon(a), 12)}<span>${esc(auctionPrize(a))}</span></div></td><td class="r">${fmt(a.supply, 0)}</td>
+      <td class="r dim">${[a.sfl ? `${fmt(a.sfl)} FLOWER` : "", ...Object.entries(a.ingredients || {}).map(([k, v]) => `${fmt(v)} ${esc(k)}`)].filter(Boolean).join(" + ") || "gratis"}</td></tr>`).join("")}</tbody></table></div>
+    ${list.length > 150 ? `<div class="mod-f"><span>Mostrando 150 de ${list.length}: filtra por premio para ver más</span></div>` : ""}`;
+}
 function wAuctionHistory() {
+  if (!has("worldAuctions")) return wAuctionHistoryOfficial();
   const t = now();
   const q = S.auHistQ.trim().toLowerCase();
   const all = store.worldAuctions.data.filter((a) => a.endAt < t && a.result?.leaderboard).sort((x, y) => y.endAt - x.endAt);
@@ -373,7 +389,7 @@ async function findPlayer(name) {
     const r = await api(`/api/ext/user/${encodeURIComponent(name)}`);
     openPlayerCardFor(r.farm_id ?? r.nft_id, r.username || name, $("#search"));
   } catch (e) {
-    toast(e.status === 404 ? `No hay ninguna granja llamada «${name}» (sfl.world tarda de 2 a 7 días en ver granjas nuevas)` : "No se pudo buscar: sfl.world no responde", 4500);
+    toast(e.status === 404 ? `No hay ninguna granja llamada «${name}» (las granjas de hoy aparecen al día siguiente)` : "No se pudo buscar por nombre ahora mismo: prueba con el número de la granja", 4500);
   }
 }
 function closeSearch() { $("#searchRes").hidden = true; }

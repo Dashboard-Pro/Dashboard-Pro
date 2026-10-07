@@ -443,7 +443,7 @@ async function friendAdd(q) {
   try {
     let id = q, name = null;
     if (!/^\d+$/.test(q)) {
-      const r = await api(`/api/ext/user/${encodeURIComponent(q)}`).catch((e) => { throw new Error(e.status === 404 ? `No hay ninguna granja llamada «${q}» (sfl.world tarda de 2 a 7 días en ver granjas nuevas): prueba con su ID` : "No se pudo buscar: sfl.world no responde"); });
+      const r = await api(`/api/ext/user/${encodeURIComponent(q)}`).catch((e) => { throw new Error(e.status === 404 ? `No hay ninguna granja llamada «${q}» (las granjas de hoy aparecen al día siguiente): prueba con su ID` : "No se pudo buscar por nombre ahora mismo: prueba con su ID"); });
       id = String(r.farm_id ?? r.nft_id); name = r.username || q;
     }
     if (String(id) === String(S.farmId)) throw new Error("Esa es tu granja");
