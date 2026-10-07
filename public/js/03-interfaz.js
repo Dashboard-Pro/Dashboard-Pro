@@ -89,7 +89,7 @@ function petTypeRef(items, id) {
 
 // Tesoros de la playa: desactivados en el marketplace (tradeable isActive=false, fuera de TRADE_LIMITS) aunque sigan
 // colgados anuncios de 2025 con su floor. Ese precio no sirve: solo se pueden vender a la tienda del juego.
-const deadMarket = (name) => G.treasureSellPrices?.[name] != null && !(name in (G.tradeResources || {}));
+const deadMarket = (name) => G.treasureSellPrices?.[name] != null && !(G.tradeResources || []).includes(name);
 // Lo que te paga la tienda por un tesoro, en FLOWER (con Treasure Map y Camel si los tienes colocados)
 const treasureShopFlw = (name) => (G.treasureSellPrices?.[name] ? (G.treasureSellPrices[name] * convBoosts("auto").treasure) / coinRate() : null);
 
