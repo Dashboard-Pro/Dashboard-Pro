@@ -438,6 +438,7 @@ const MIME = {
   ".png": "image/png",
   ".ico": "image/x-icon",
   ".json": "application/json",
+  ".webmanifest": "application/manifest+json",
 };
 
 const SECURITY_HEADERS = {
@@ -1200,6 +1201,7 @@ const server = http.createServer((req, res) => {
   const webhook = CLOUD && url.pathname === "/api/billing/kofi";
   if (req.method !== "GET" && !webhook && !sameOriginWrite(req)) return send(res, 403, { error: "Origen no permitido" });
   if (CLOUD && url.pathname.startsWith("/api/") && !rateOk(req)) return send(res, 429, { error: "Demasiadas peticiones: espera un momento" });
+  if (url.pathname.startsWith("/api/")) lastClientAt = Date.now(); // modo app: hay una ventana abierta
   if (url.pathname.startsWith("/api/") || (CLOUD && url.pathname.startsWith("/auth/"))) {
     handleApi(req, res, url).catch((err) => send(res, 500, { error: err.message }));
   } else {
@@ -1211,11 +1213,43 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // start.bat / start.command (SFL_OPEN_BROWSER=1): el navegador se abre cuando el servidor ya escucha; antes se abría
 // antes de tiempo y salía "no hay conexión"
+// SFL_OPEN_BROWSER=app: ventana propia (Chrome o Edge con --app: sin pestañas ni barra de direcciones), con el perfil
+// de siempre para no perder los ajustes guardados en el navegador; si no hay ninguno, el navegador por defecto.
+function appBrowser() {
+  const L = process.env.LOCALAPPDATA || "", PF = process.env.ProgramFiles || "C:/Program Files", PF86 = process.env["ProgramFiles(x86)"] || "C:/Program Files (x86)";
+  const list = process.platform === "win32"
+    ? [path.join(PF, "Google/Chrome/Application/chrome.exe"), path.join(PF86, "Google/Chrome/Application/chrome.exe"), path.join(L, "Google/Chrome/Application/chrome.exe"),
+      path.join(PF86, "Microsoft/Edge/Application/msedge.exe"), path.join(PF, "Microsoft/Edge/Application/msedge.exe")]
+    : process.platform === "darwin"
+      ? ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge", "/Applications/Chromium.app/Contents/MacOS/Chromium"]
+      : ["/usr/bin/google-chrome", "/usr/bin/chromium", "/usr/bin/chromium-browser", "/usr/bin/microsoft-edge"];
+  return list.find((p) => { try { return fs.statSync(p).isFile(); } catch { return false; } }) || null;
+}
 function openBrowser(u) {
-  if (process.env.SFL_OPEN_BROWSER !== "1" || CLOUD) return;
+  const mode = process.env.SFL_OPEN_BROWSER;
+  if (!mode || mode === "0" || CLOUD) return;
   const { spawn: sp } = require("node:child_process");
-  const [cmd, args] = process.platform === "win32" ? ["cmd", ["/c", "start", "", u]] : process.platform === "darwin" ? ["open", [u]] : ["xdg-open", [u]];
+  const exe = mode === "app" ? appBrowser() : null;
+  const [cmd, args] = exe ? [exe, [`--app=${u}`, "--window-size=1440,900"]]
+    : process.platform === "win32" ? ["cmd", ["/c", "start", "", u]] : process.platform === "darwin" ? ["open", [u]] : ["xdg-open", [u]];
   try { sp(cmd, args, { stdio: "ignore", detached: true }).unref(); } catch { /* sin navegador: se abre a mano */ }
+}
+// Modo app (SFL_APP=1, servidor escondido): al cerrar la ventana se cierra también el servidor. La página pide /api/status
+// cada 15 s (en segundo plano el navegador lo baja a 1/min); 5 min sin nadie = cerrado. Si el ordenador se suspende, ese
+// hueco no cuenta: al despertar se da otro margen antes de mirar.
+const APP_IDLE_MS = Number(process.env.SFL_APP_IDLE_MS) || 5 * 60_000;
+let lastClientAt = 0;
+if (process.env.SFL_APP === "1" && !CLOUD) {
+  let lastCheck = Date.now();
+  setInterval(() => {
+    const t = Date.now();
+    if (t - lastCheck > 3 * 30_000) lastClientAt = t; // suspendido / despertado: margen nuevo
+    lastCheck = t;
+    if (lastClientAt && t - lastClientAt > APP_IDLE_MS && !(nightly && nightly.status().running)) {
+      console.log("  Ventana de la app cerrada: se cierra el servidor.");
+      process.exit(0);
+    }
+  }, 30_000).unref();
 }
 server.on("error", (e) => {
   if (e.code !== "EADDRINUSE" || CLOUD) throw e;

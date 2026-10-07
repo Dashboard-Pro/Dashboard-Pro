@@ -15,5 +15,5 @@ if ! node -e "process.exit(Number(process.versions.node.split('.')[0]) < 18 ? 1 
   read -r -p "  Pulsa Intro para cerrar…"
   exit 1
 fi
-# El servidor abre el navegador cuando ya está escuchando
-SFL_OPEN_BROWSER=1 node tools/run.js
+# El servidor abre la ventana de la app (Chrome/Edge en modo --app) cuando ya está escuchando
+SFL_OPEN_BROWSER=app node tools/run.js

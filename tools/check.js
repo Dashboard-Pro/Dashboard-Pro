@@ -425,6 +425,13 @@ async function cloudChecks(localPost, localFarm) {
     const farm = await req("/api/farm/29411");
     ok(farm.status === 200 && farm.json.farm && farm.json.id, "granja");
     {
+      // App: manifiesto e iconos propios servidos con su tipo
+      const mf = await fetch(`${base}/manifest.webmanifest`);
+      const mj = await mf.json().catch(() => null);
+      const ic = await Promise.all((mj?.icons || []).map((i) => fetch(`${base}/${i.src}`).then((r) => r.ok && r.headers.get("content-type") === i.type)));
+      ok(/manifest\+json/.test(mf.headers.get("content-type") || "") && mj.display === "standalone" && ic.length >= 2 && ic.every(Boolean) && (await fetch(`${base}/icon.ico`)).ok, "app: manifiesto e iconos");
+    }
+    {
       // Excavación en directo: ?fresh=1 solo guarda 5 s (lo normal, 45 s)
       const h1 = (await fetch(`${base}/api/farm/29411?fresh=1`)).headers.get("x-cache");
       await new Promise((r) => setTimeout(r, 5200));

@@ -12,7 +12,8 @@ primera vez que lo abres te pregunta cuál quieres, y luego se cambia en **Ajust
 ## Arrancar
 
 ```
-start.bat            (Windows, doble clic)  → abre http://localhost:4173
+start.bat            (Windows, doble clic)  → abre SFL Console en su propia ventana, sin consola, y crea el acceso directo
+                     "SFL Console" en el escritorio y el menú Inicio (start.bat consola = con la consola a la vista)
 start.command        (macOS, doble clic; la primera vez: chmod +x start.command)
 npm start            (lo mismo en cualquier sistema)
 npm run demo         → datos simulados en http://localhost:4174, sin key

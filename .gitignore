@@ -11,5 +11,7 @@ node_modules/
 dist/
 # Copia local de lo último bueno de sfl.world (cada ordenador la suya)
 data/ext-cache/
+# Registro del servidor en modo app (sin consola)
+dashboard.log
 # Historial de cada jugador: se queda en su ordenador
 data/

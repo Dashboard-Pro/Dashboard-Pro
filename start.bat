@@ -1,15 +1,25 @@
 @echo off
 cd /d "%~dp0"
-title SFL Dashboard
+title SFL Console
 
-rem Sin Node.js el servidor no arranca y el navegador solo muestra "no hay conexion": se avisa antes
+rem Sin Node.js el servidor no arranca y la ventana solo muestra "no hay conexion": se avisa antes
 where node >nul 2>nul
 if errorlevel 1 goto nonode
 node -e "process.exit(Number(process.versions.node.split('.')[0]) < 18 ? 1 : 0)"
 if errorlevel 1 goto oldnode
 
-rem El servidor abre el navegador cuando ya esta escuchando (antes se abria antes de tiempo)
-set SFL_OPEN_BROWSER=1
+rem "start.bat consola": como antes, con esta ventana abierta y lo que escribe el servidor a la vista
+if /i "%~1"=="consola" goto consola
+
+rem La primera vez: acceso directo "SFL Console" con su icono en el escritorio y en el menu Inicio
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\acceso-directo.ps1" -SiFalta
+
+rem App: servidor sin consola y ventana propia (se abre cuando el servidor ya escucha)
+wscript //nologo "%~dp0tools\app.vbs"
+exit /b
+
+:consola
+set SFL_OPEN_BROWSER=app
 node tools/run.js
 echo.
 echo   El dashboard se ha cerrado. Si arriba sale un error, copialo para pedir ayuda.
