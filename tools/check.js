@@ -424,6 +424,13 @@ async function cloudChecks(localPost, localFarm) {
     { const u = await req("/api/update"); ok(u.status === 200 && u.json.enabled === false, "actualizaciones: la carpeta de desarrollo no se actualiza sola"); }
     const farm = await req("/api/farm/29411");
     ok(farm.status === 200 && farm.json.farm && farm.json.id, "granja");
+    {
+      // Excavación en directo: ?fresh=1 solo guarda 5 s (lo normal, 45 s)
+      const h1 = (await fetch(`${base}/api/farm/29411?fresh=1`)).headers.get("x-cache");
+      await new Promise((r) => setTimeout(r, 5200));
+      const h2 = (await fetch(`${base}/api/farm/29411?fresh=1`)).headers.get("x-cache"), h3 = (await fetch(`${base}/api/farm/29411`)).headers.get("x-cache");
+      ok(h1 === "hit" && h2 === "miss" && h3 === "hit", "granja en directo para la excavación (caché de 5 s con ?fresh=1)");
+    }
     for (const type of ["marketplaceActivity", "statsLeaderboard", "auctions", "raffles", "discordAnnouncements"]) {
       ok((await req(`/api/data?type=${type}`)).status === 200, `data ${type}`);
     }

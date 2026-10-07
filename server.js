@@ -1138,7 +1138,9 @@ async function handleApi(req, res, url) {
 
   const farm = p.match(/^\/api\/farm\/([A-Za-z0-9]+)$/);
   if (farm) {
-    const r = await cached(`farm:${farm[1]}`, `${UPSTREAM}/farms/${farm[1]}`, TTL.farm);
+    // ?fresh=1 (Excavación mientras juegas): caché de 5 s; la API oficial no cachea, así que se ve lo último guardado
+    const fresh = !CLOUD && url.searchParams.get("fresh") === "1";
+    const r = await cached(`farm:${farm[1]}`, `${UPSTREAM}/farms/${farm[1]}`, fresh ? 5_000 : TTL.farm);
     return send(res, r.status, r.body || "{}", meta(r));
   }
 

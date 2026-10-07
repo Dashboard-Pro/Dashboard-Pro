@@ -244,6 +244,34 @@ function digModel() {
   };
 }
 
+// Mientras la página de Excavación está abierta: la granja cada DIG_FAST_MS (la API oficial no cachea; el servidor
+// deja ?fresh=1 con 5 s de caché). 8 s deja sitio en la cola (1 petición / 5,2 s) para lo demás. Solo se repinta si
+// cambia la excavación; el resto de la granja se actualiza en silencio.
+const DIG_FAST_MS = 8_000;
+let digFastTimer = null;
+async function digFastTick() {
+  if (S.page !== "dig" || !S.farmId || store.farm?.promise) return;
+  const path = `/api/farm/${encodeURIComponent(S.farmId)}?fresh=1`;
+  try {
+    const res = await api(path);
+    const s = store.farm;
+    if (!res?.farm || !s || S.page !== "dig") return;
+    const before = JSON.stringify(s.data?.farm?.desert?.digging || null);
+    const model = buildFarmModel(res.farm);
+    s.data = { ...res, ...model, fetchedAt: fetchedAt(path) };
+    s.at = now();
+    S.digLastSync = Date.now();
+    if (JSON.stringify(res.farm.desert?.digging || null) !== before) repaint("farm");
+    else { const el = $("#dg-sync"); if (el) el.textContent = digSyncTxt(); }
+  } catch { /* el siguiente intento lo vuelve a probar */ }
+}
+const digSyncTxt = () => `en directo: cada ${DIG_FAST_MS / 1000} s${S.digLastSync ? ` · comprobado a las ${new Date(S.digLastSync).toLocaleTimeString(LOCALE)}` : ""}`;
+function startDigFast() {
+  clearInterval(digFastTimer);
+  digFastTimer = setInterval(() => { if (S.page !== "dig") { clearInterval(digFastTimer); digFastTimer = null; return; } digFastTick(); }, DIG_FAST_MS);
+  digFastTick();
+}
+
 // Casilla sin cavar con más probabilidad y el mejor 2×2 para el taladro (suma de probabilidades)
 function digBest(m) {
   const at = (x, y) => m.solved.cells[y * m.width + x];
@@ -279,7 +307,7 @@ function wDigKpis() {
 function wDigBoard() {
   const m = digModel(), r = m.solved;
   if (!m.patterns.length) return Empty("crab", "Sin patrones", "La granja no trae los patrones del día.");
-  setSub("dg-board", m.stale ? `<span class="tag sun">sitio de ayer</span> el de hoy aparece cuando entres al desierto` : r.impossible ? "" : `${r.exact ? "exacto" : "aproximado"} · ${r.exact ? `${fmt(r.total, 0)} formas de colocar los patrones` : "demasiadas combinaciones para contarlas todas"}`);
+  setSub("dg-board", `<span class="tag green" id="dg-sync" title="Mientras tengas esta página abierta, tu granja se pide cada pocos segundos: lo que caves en el juego sale aquí en cuanto el juego lo guarda">${digSyncTxt()}</span> ` + (m.stale ? `<span class="tag sun">sitio de ayer</span> el de hoy aparece cuando entres al desierto` : r.impossible ? "" : `${r.exact ? "exacto" : "aproximado"} · ${r.exact ? `${fmt(r.total, 0)} formas de colocar los patrones` : "demasiadas combinaciones para contarlas todas"}`));
   if (r.impossible) return Empty("warn", "Los datos no encajan", "Ninguna forma de colocar los patrones de hoy encaja con lo cavado. Puede que el juego haya cambiado sus reglas.");
   const best = digBest(m);
   const inDrill = (c) => best.drill && c.x >= best.drill.x && c.x <= best.drill.x + 1 && c.y >= best.drill.y && c.y <= best.drill.y + 1;

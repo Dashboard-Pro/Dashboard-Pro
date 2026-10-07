@@ -229,6 +229,7 @@ const PAGES = {
     mount("dg-k", { deps: ["farm"], render: wDigKpis, loading: "block" });
     mount("dg-board", { deps: ["farm"], render: wDigBoard, loading: "block" });
     mount("dg-pats", { deps: ["farm"], render: wDigPatterns, loading: "rows" });
+    startDigFast(); // tu granja cada pocos segundos mientras estés aquí
   },
 
   faction() {

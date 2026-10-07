@@ -14,5 +14,8 @@
 "{0} subastas terminadas · sfl.world no responde: pulsa una para ver su clasificación (API oficial)":"{0} finished auctions · sfl.world isn't responding: click one to see its leaderboard (official API)",
 "sfl.world no responde: sin recetas de cruce por ahora":"sfl.world isn't responding: no cross recipes for now",
 "· sfl.world no responde: sin recetas de cruce por ahora":"· sfl.world isn't responding: no cross recipes for now",
-"desactivado en el marketplace: no se puede comprar (los anuncios que quedan son antiguos), solo vender los tuyos a la tienda":"disabled on the marketplace: it can't be bought (the listings left are old), you can only sell yours to the shop"
+"desactivado en el marketplace: no se puede comprar (los anuncios que quedan son antiguos), solo vender los tuyos a la tienda":"disabled on the marketplace: it can't be bought (the listings left are old), you can only sell yours to the shop",
+"en directo: cada {0} s":"live: every {0} s",
+"en directo: cada {0} s · comprobado a las {1}":"live: every {0} s · checked at {1}",
+"Mientras tengas esta página abierta, tu granja se pide cada pocos segundos: lo que caves en el juego sale aquí en cuanto el juego lo guarda":"While this page is open your farm is fetched every few seconds: what you dig in the game shows up here as soon as the game saves it"
 }
