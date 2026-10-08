@@ -428,7 +428,10 @@ function timerValue(x) {
   const grp = { crops: "crops", fruits: "fruits", greenhouse: "greenhouse" }[x.cat];
   const item = READY_NODE[x.cat] || (grp || x.cat === "cooking" ? x.name : null);
   if (!item) return null;
-  const qty = x.cat === "cooking" ? 1 : yieldOf(grp || "resources", item) ?? 1;
+  // Nodos: lo que dará ESE nodo (exacto en petróleo y crimstone); cultivos y frutas, la media con tus boosts
+  const NODE_OBJ = { trees: "trees", stones: "stones", iron: "iron", gold: "gold", crimstones: "crimstones", sunstones: "sunstones", oil: "oilReserves" };
+  const farm = store.farm?.data?.farm, node = NODE_OBJ[x.cat] && x.id != null ? farm?.[NODE_OBJ[x.cat]]?.[x.id] : null;
+  const qty = x.cat === "cooking" ? 1 : (node && nextNodeYield(x.cat, node, farm)) ?? yieldOf(grp || "resources", item) ?? 1;
   const p = priceBook()(item).v;
   return p == null ? null : { item, qty, v: qty * p };
 }

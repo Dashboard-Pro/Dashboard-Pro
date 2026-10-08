@@ -100,11 +100,24 @@ function recordError(status, path) {
   if (errorLog.length > 50) errorLog.shift();
 }
 
+// Prioridad en la cola: 0 = granjas (lo que más se nota al abrir una página), 1 = lo demás que pide la página, 2 = trabajo
+// de fondo (archivo de operaciones, rescate de compras, volcado). Lo de fondo se marca con inBackground(fn) y, si lleva más
+// de un minuto esperando, sube a 1 para que nunca se quede atascado detrás de la página.
+const { AsyncLocalStorage } = require("node:async_hooks");
+const bgStore = new AsyncLocalStorage();
+const inBackground = (fn) => bgStore.run(true, fn);
+const isBackground = () => bgStore.getStore() === true;
+const BG_AGING_MS = Number(process.env.SFL_BG_AGING_MS) || 60_000;
+const jobPriority = (j, t) => (j.bg ? (t - j.addedAt > BG_AGING_MS ? 1 : 2) : /\/farms\//.test(j.url) ? 0 : 1);
 function enqueue(url) {
   return new Promise((resolve) => {
-    queue.push({ url, resolve, notBefore: 0, retries: 0 });
+    queue.push({ url, resolve, notBefore: 0, retries: 0, bg: isBackground(), addedAt: Date.now() });
     drain();
   });
+}
+// La página pide algo que ya esperaba en la cola como trabajo de fondo: deja de serlo
+function promote(url) {
+  for (const j of queue) if (j.url === url && j.bg) { j.bg = false; stats.promoted = (stats.promoted || 0) + 1; }
 }
 
 // Cola serie con 5,2 s entre llamadas. Un trabajo en espera de reintento (notBefore) no bloquea
@@ -112,15 +125,26 @@ function enqueue(url) {
 async function drain() {
   if (draining) return;
   draining = true;
+  // El que ya puede salir con más prioridad; a igualdad, el que llegó antes (orden de la cola)
+  const pick = (t) => {
+    let idx = -1;
+    for (let i = 0; i < queue.length; i++) {
+      if (queue[i].notBefore > t) continue;
+      if (idx < 0 || jobPriority(queue[i], t) < jobPriority(queue[idx], t)) idx = i;
+    }
+    return idx;
+  };
   while (queue.length) {
     const nowT = Date.now();
-    let idx = queue.findIndex((j) => j.notBefore <= nowT);
-    if (idx < 0) {
+    if (pick(nowT) < 0) {
       await sleep(Math.min(...queue.map((j) => j.notBefore)) - nowT);
       continue;
     }
     const wait = lastCallAt + MIN_GAP_MS - Date.now();
     if (wait > 0) await sleep(wait);
+    // Se elige después de esperar el hueco: lo que la página haya pedido mientras tanto pasa delante
+    let idx = pick(Date.now());
+    if (idx < 0) continue;
     lastCallAt = Date.now();
     const job = queue[idx];
     const res = await callUpstream(job.url);
@@ -180,7 +204,7 @@ async function cached(key, url, ttl) {
         return res;
       }),
     );
-  }
+  } else if (!isBackground()) promote(url); // ya iba en la cola como trabajo de fondo y ahora lo pide la página
   const res = await inflight.get(key);
   // Si falla pero teníamos una copia vieja, mejor servir la vieja que un error.
   if (res.status !== 200 && hit) return { ...hit, cache: "stale" };
@@ -471,6 +495,7 @@ function status() {
     gameData: gameUpdater.status(),
     farmId: config.farmId ?? null,
     queue: queue.length,
+    queueBackground: queue.filter((j) => j.bg).length,
     nextSlotInMs: Math.max(0, lastCallAt + MIN_GAP_MS - Date.now()),
     serverOffsetMs,
     ...stats,
@@ -940,7 +965,7 @@ async function handleApi(req, res, url) {
     if (p === "/api/dump") {
       const body = await readBody(req).catch(() => ({}));
       saveConfig({ nightlyDump: Boolean(body.enabled) });
-      if (body.enabled && config.apiKey) nightly.ingest().then(() => cloudSyncSoon()).catch(() => {});
+      if (body.enabled && config.apiKey) inBackground(() => nightly.ingest()).then(() => cloudSyncSoon()).catch(() => {});
       return send(res, 200, nightly.status());
     }
     if (p === "/api/dump/now") {
@@ -950,7 +975,7 @@ async function handleApi(req, res, url) {
       const wait = st.lastRunAt && !st.lastError ? st.lastRunAt + DUMP_MIN_GAP_MS - Date.now() : 0;
       if (st.running) return send(res, 409, { error: "Ya se está procesando", ...st });
       if (wait > 0) return send(res, 429, { error: `Ya se procesó hace poco: espera ${Math.ceil(wait / 60_000)} min`, ...st });
-      nightly.ingest({ force: true }).then(() => cloudSyncSoon()).catch(() => {}); // en segundo plano: ~1-2 min
+      inBackground(() => nightly.ingest({ force: true })).then(() => cloudSyncSoon()).catch(() => {}); // en segundo plano: ~1-2 min
       return send(res, 202, { ...nightly.status(), running: true });
     }
     return send(res, 404, { error: "Ruta desconocida" });
@@ -1145,7 +1170,7 @@ async function handleApi(req, res, url) {
     try { body = await readBody(req); } catch { return send(res, 400, { error: "JSON inválido" }); }
     const keys = [...new Set((Array.isArray(body.keys) ? body.keys : []).filter((k) => /^(collectibles|wearables|pets|buds)-\d+$/.test(k)))].slice(0, 400);
     if (!body.farmId || body.me == null || !keys.length) return send(res, 400, { error: "Faltan farmId, me o keys" });
-    runRescan(String(body.farmId), body.me, keys);
+    inBackground(() => runRescan(String(body.farmId), body.me, keys));
     return send(res, 202, rescan);
   }
 
@@ -1323,8 +1348,8 @@ server.listen(config.port, CLOUD ? process.env.HOST || "0.0.0.0" : "127.0.0.1", 
     setTimeout(look, 30_000);
     setInterval(look, 6 * 3600_000);
   }
-  setTimeout(() => backgroundArchive().catch(() => {}), 15_000);
-  setInterval(() => backgroundArchive().catch(() => {}), 20 * 60_000);
+  setTimeout(() => inBackground(() => backgroundArchive()).catch(() => {}), 15_000);
+  setInterval(() => inBackground(() => backgroundArchive()).catch(() => {}), 20 * 60_000);
   if (cloudClient) {
     setTimeout(() => cloudClient.sync().catch(() => {}), 20_000);
     setInterval(() => cloudClient.sync().catch(() => {}), 10 * 60_000);
@@ -1339,7 +1364,7 @@ server.listen(config.port, CLOUD ? process.env.HOST || "0.0.0.0" : "127.0.0.1", 
   }
   // Volcado nocturno: sale hacia las 22:00 UTC; cada hora se mira si hay uno nuevo (1 consulta al índice)
   if (nightly) {
-    const tick = () => { if (config.nightlyDump && config.apiKey) nightly.ingest().then((s) => { if (!s.lastError) cloudSyncSoon(); }).catch(() => {}); };
+    const tick = () => { if (config.nightlyDump && config.apiKey) inBackground(() => nightly.ingest()).then((s) => { if (!s.lastError) cloudSyncSoon(); }).catch(() => {}); };
     setTimeout(tick, 90_000);
     setInterval(tick, 60 * 60_000);
   }

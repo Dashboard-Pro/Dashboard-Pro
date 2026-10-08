@@ -207,7 +207,7 @@ ok(Object.values(G.chapterArtefact || {}).includes("Otter Pebble"), "artefacto d
   // Cantidades por cosecha/golpe con las fórmulas del juego (28-cantidades.js), con casos sacados del código del juego
   Object.assign(global, { G, toNum: (v) => Number(v) || 0, now: () => Date.now(), tempActiveNow: () => false,
     AOE_RANK: [{ xLeft: 3, xRight: 3, depth: 7 }, { xLeft: 4, xRight: 3, depth: 8 }, { xLeft: 4, xRight: 4, depth: 9 }] });
-  const { farmYields } = require("../public/js/28-cantidades.js");
+  const { farmYields, nextNodeYield } = require("../public/js/28-cantidades.js");
   const at = (x, y) => [{ coordinates: { x, y }, createdAt: 0 }];
   const farm = {
     bumpkin: { skills: { "Tough Tree": 1, "Lumberjack's Extra": 1, "Oil Extraction": 1, "Horror Mike": 1 }, equipped: { shirt: "Crimstone Armor" } },
@@ -226,6 +226,11 @@ ok(Object.values(G.chapterArtefact || {}).includes("Otter Pebble"), "artefacto d
   // Zanahoria (media): Scary Mike con Horror Mike 1 = zona 7×7 y +0.3 → solo la parcela de dentro
   ok(Math.abs(y.crops.carrot.avg - 1.15) < 1e-9 && y.crops.carrot.max === 1.3, "cantidades: zonas de efecto parcela a parcela (Scary Mike + Horror Mike)");
   ok(Math.abs(y.fruits.apple.avg - 1.1) < 1e-9 && y.greenhouse.grape.avg === 1, "cantidades: Macaw en frutas de parcela y no en la uva del invernadero");
+  // Nodo a nodo: el pozo sabe si la próxima es la tercera (+20) y la crimstone si es su última picada; el "amount" viejo no cuenta
+  const near = (v, w) => Math.abs(v - w) < 1e-9;
+  ok(near(nextNodeYield("oil", { drilled: 1, oil: { amount: 99 } }, farm), 11.1) && near(nextNodeYield("oil", { drilled: 2 }, farm), 31.1)
+    && near(nextNodeYield("crimstones", { minesLeft: 1 }, farm), 3.1) && near(nextNodeYield("crimstones", { minesLeft: 4 }, farm), 1.1),
+    "cantidades: lo exacto del próximo golpe de cada pozo y cada crimstone");
 }
 {
   // Solver de excavación con un sitio real (granja 153785, 30-09-2026): 29 hoyos, 924 combinaciones posibles
@@ -534,6 +539,19 @@ async function cloudChecks(localPost, localFarm) {
     const after = (await req(`/api/history?farmId=${farm.json.id}`)).json.trades;
     ok(after.some((t) => t.id === "old-601" && t.via === "item") && after.some((t) => t.id === "old-415"), "compras antiguas rescatadas al archivo");
     ok((await req("/api/rescan")).json.found === 2, "recuento de rescatadas");
+    {
+      // Prioridad en la cola: con un rescate largo en marcha (trabajo de fondo), lo que pide la página pasa delante
+      const many = Array.from({ length: 30 }, (_, i) => `collectibles-${7000 + i}`);
+      const big = await post("/api/rescan", { farmId: farm.json.id, me: farm.json.id, keys: many });
+      await new Promise((r) => setTimeout(r, 400)); // que la cola ya esté llena de trabajo de fondo
+      const st0 = (await req("/api/status")).json;
+      const t0 = Date.now();
+      const page = await req("/api/farm/556");
+      const took = Date.now() - t0, rsNow = (await req("/api/rescan")).json;
+      ok(big.status === 202 && st0.queueBackground >= 1 && page.status === 200 && rsNow.running && rsNow.done < rsNow.total && took < 2000,
+        `la página pasa delante del trabajo de fondo en la cola (granja en ${took} ms con ${st0.queueBackground} de fondo esperando)`);
+      for (let i = 0; i < 200 && (await req("/api/rescan")).json.running; i++) await new Promise((r) => setTimeout(r, 100));
+    }
 
     section("Sincronización de data/ por GitHub");
     await gitSyncChecks();

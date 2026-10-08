@@ -305,6 +305,23 @@ function yGreenhouse(c, name, mode) {
   return a;
 }
 
+// Lo que dará el próximo golpe de UN nodo concreto: exacto cuando se sabe (petróleo: se sabe si toca la perforación con +20,
+// una de cada tres; crimstone: la última de cada 5 picadas da el extra) y, si no, la media de
+// ese nodo con su multiplicador y nivel de forja y sus zonas de efecto. kind = categoría del temporizador / nodo del mapa.
+function nextNodeYield(kind, node, farm) {
+  if (!node || !farm) return null;
+  const c = yieldCtx(farm);
+  // El "amount" que guardan algunos nodos es de versiones antiguas: el juego ya calcula al perforar/picar (drillOilReserve.ts)
+  if (kind === "oil") return yOil(c, node, (toNum(node.drilled) + 1) % 3 === 0 ? "max" : "min");
+  if (kind === "crimstones") return yCrim(c, node, toNum(node.minesLeft) === 1 ? "max" : "min");
+  if (kind === "trees") return yWood(c, node, "avg");
+  if (kind === "stones") return yStone(c, node, "avg");
+  if (kind === "iron") return yIron(c, node, "avg");
+  if (kind === "gold") return yGold(c, node, "avg");
+  if (kind === "sunstones") return 1;
+  return null;
+}
+
 // Media (y mín/máx) sobre todos tus nodos o parcelas: cada uno con su multiplicador, nivel y zonas de efecto
 const placedNodesOf = (obj) => Object.values(obj || {}).filter((n) => n && !n.removedAt && n.x != null);
 function spread(fn, nodes) {
@@ -335,4 +352,4 @@ function farmYields(farm) {
 }
 
 // Para los tests en Node (tools/check.js): ahí G, toNum, now… se definen como globales antes de cargarlo
-if (typeof module !== "undefined") module.exports = { farmYields, yieldCtx, aoeHits };
+if (typeof module !== "undefined") module.exports = { farmYields, yieldCtx, aoeHits, nextNodeYield };

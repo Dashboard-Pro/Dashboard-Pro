@@ -117,8 +117,10 @@ function mapModel() {
   const amountOf = (n) => {
     const [obj, part] = NODE_PART[n.kind] || [];
     const node = obj && n.timer?.id != null ? farm[obj]?.[n.timer.id] : null;
-    const a = node?.[part]?.amount;
-    if (a != null) return toNum(a);
+    // Nodo a nodo con las fórmulas del juego (exacto en petróleo y crimstone). El "amount" que guardan algunos nodos es de
+    // versiones antiguas del juego (ya no se actualiza: la cantidad se calcula al recoger), así que no se usa.
+    const ex = n.timer ? nextNodeYield(n.kind, node, farm) : null;
+    if (ex != null) return Math.round(ex * 100) / 100;
     if (n.kind === "crops") return n.timer ? yieldOf("crops", n.name) ?? 1 : null;
     if (n.kind === "fruits") return n.timer ? yieldOf("fruits", n.name) ?? 1 : null;
     const item = NODE_ITEM[n.kind];
