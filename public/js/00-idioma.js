@@ -46,7 +46,7 @@ const I18N = (() => {
       if (i < parts.length - 1 && !/\s$/.test(p)) toks.pop();
       whole.push(...toks);
     });
-    const t = { re: new RegExp(re + "\\s*$", "s"), idx, out: v, score: lit.replace(/\s+/g, "").length, letters: (lit.match(/[a-záéíóúñü]/gi) || []).length };
+    const t = { re: new RegExp(re + "\\s*$", "s"), idx, out: v, score: lit.replace(/\s+/g, "").length, letters: (lit.match(/[a-záéíóúñü]/gi) || []).length, dot: lit.includes("·") };
     const words = whole.join(" ").toLowerCase().match(/(?<![a-záéíóúñü])[a-záéíóúñü]{3,}(?![a-záéíóúñü])/g);
     if (!words) { loose.push(t); continue; }
     const key = words.sort((a, b) => b.length - a.length)[0];
@@ -80,6 +80,8 @@ const I18N = (() => {
     for (const w of words) for (const t of buckets.get(w) || []) test(t);
     for (const t of loose) test(t);
     if (!best) return null;
+    // Una plantilla de casi nada ("{0} de {1}") sobre una frase con " · " la corta por donde no es: mejor trozo a trozo
+    if (key.includes(" · ") && !best.dot && best.letters <= 3) return null;
     const vals = {};
     best.idx.forEach((n, i) => { vals[n] = bestM[i + 1]; });
     return best.out.replace(/\{(\d+)\}/g, (_, n) => tr(vals[n] ?? ""));
