@@ -89,6 +89,8 @@ function farm() {
       { date: new Date(t0 + 4 * 24 * H).toISOString().slice(0, 10), name: "tornado", weather: true },
     ] },
     npcs: {},
+    // Stock de las tiendas (Resumen → Stock en las tiendas): herramientas y semillas que quedan hoy
+    stock: { Axe: 75, Pickaxe: 29, "Stone Pickaxe": 6, "Iron Pickaxe": 3, "Gold Pickaxe": 2, "Rod": 15, "Sunflower Seed": 400, "Potato Seed": 200, "Pumpkin Seed": 150, "Carrot Seed": 100 },
     delivery: { orders: [
       { id: "o1", from: "tywin", createdAt: t0 - 30 * H, readyAt: t0 - 30 * H, items: { "Gold Pickaxe": 2, coins: 9500 }, reward: {} },
       { id: "o2", from: "raven", createdAt: t0 - 5 * H, readyAt: t0 - 5 * H, items: { Kale: 80, Wheat: 150 }, reward: {} },

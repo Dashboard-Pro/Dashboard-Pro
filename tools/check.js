@@ -21,10 +21,10 @@ const BROWSERS = [process.env.SFL_BROWSER,
   "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe", "C:/Program Files/Microsoft/Edge/Application/msedge.exe",
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
   "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge", "/usr/bin/google-chrome", "/usr/bin/chromium"].filter(Boolean);
-function dumpDom(browser, url, profile) {
+function dumpDom(browser, url, profile, extra = []) {
   return new Promise((resolve) => {
     const p = spawn(browser, ["--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check", `--user-data-dir=${profile}`,
-      "--virtual-time-budget=12000", "--dump-dom", url], { stdio: ["ignore", "pipe", "ignore"] });
+      "--virtual-time-budget=12000", ...extra, "--dump-dom", url], { stdio: ["ignore", "pipe", "ignore"] });
     let out = "";
     p.stdout.on("data", (c) => (out += c));
     const kill = setTimeout(() => p.kill(), 60_000);
@@ -38,9 +38,14 @@ function uiProblems(dom, p) {
   const errMods = (dom.match(/class="state err"/g) || []).length;
   const drawn = dom.includes(`data-drawn="${p}"`); // el dashboard arrancó y dibujó esta página
   const loading = (dom.match(/class="sk-row"/g) || []).length;
-  return [!dom && "no cargó", dom && !drawn && "el dashboard no arrancó", jsErr && `${jsErr} errores de JS${jsMsg ? ` (último: ${jsMsg})` : ""}`,
+  // Revisión de diseño (?audit=1, public/js/29-revision.js): lo que se sale, huecos, rejillas en una columna, página más ancha
+  let layout = [];
+  const lay = dom.match(/data-layout="([^"]*)"/)?.[1];
+  if (lay) try { layout = JSON.parse(lay.replace(/&quot;/g, "\"").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")); } catch { layout = ["data-layout ilegible"]; }
+  return [...layout, !dom && "no cargó", dom && !drawn && "el dashboard no arrancó", jsErr && `${jsErr} errores de JS${jsMsg ? ` (último: ${jsMsg})` : ""}`,
     errMods && `${errMods} módulos con error`, loading && `${loading} filas siguen cargando`].filter(Boolean);
 }
+const DESK = ["--window-size=1600,1000"], MOBILE = ["--window-size=390,844"];
 async function uiChecks() {
   section("Interfaz (navegador sin ventana)");
   let browser = null;
@@ -52,19 +57,38 @@ async function uiChecks() {
   const pages = [...html.matchAll(/data-page="(\w+)"/g)].map((m) => m[1]);
   ok(pages.length >= 10, `el menú tiene todas las páginas (${pages.length})`);
   // De 4 en 4: la demo tiene su propia cola hacia el simulador
+  let audited = 0;
   for (let i = 0; i < pages.length; i += 4) {
     const batch = pages.slice(i, i + 4);
-    const doms = await Promise.all(batch.map((p) => dumpDom(browser, `${base}/#${p}`, path.join(tmp, `ui-${p}`))));
+    const doms = await Promise.all(batch.map((p) => dumpDom(browser, `${base}/?audit=1#${p}`, path.join(tmp, `ui-${p}`), DESK)));
     for (const [j, p] of batch.entries()) {
+      if (doms[j].includes("data-layout=")) audited++;
       let why = uiProblems(doms[j], p);
       // Con 4 navegadores a la vez a veces un archivo no llega a cargar (sobrecarga puntual): se repite una vez
       // sola. Si falla dos veces es un fallo de verdad; si solo una, se avisa con el mensaje pero no cuenta.
       if (why.length) {
-        const again = uiProblems(await dumpDom(browser, `${base}/#${p}`, path.join(tmp, `ui-${p}-2`)), p);
+        const again = uiProblems(await dumpDom(browser, `${base}/?audit=1#${p}`, path.join(tmp, `ui-${p}-2`), DESK), p);
         if (!again.length) console.log(`  (aviso) página ${p}: falló una vez y bien al repetir — ${why.join(", ")}`);
         why = again;
       }
       ok(!why.length, `página ${p}${why.length ? `: ${why.join(", ")}` : ""}`);
+    }
+  }
+  ok(audited >= pages.length - 1, `la revisión de diseño se ejecutó en las páginas (${audited} de ${pages.length})`);
+  // Y detecta de verdad: con el fallo del stock (dos estilos .st-grid) metido a propósito, lo marca
+  {
+    const brk = async (n) => dumpDom(browser, `${base}/?audit=1&auditbreak=stgrid#overview`, path.join(tmp, `ui-audit-break${n}`), DESK);
+    const hit = (d) => /una sola columna en «Stock en las tiendas»/.test(d.replace(/&quot;/g, "\""));
+    ok(hit(await brk(1)) || hit(await brk(2)), "la revisión de diseño detecta una rejilla rota (stock en una columna)");
+  }
+  // En el móvil: nada más ancho que la pantalla ni que se salga de su módulo
+  for (let i = 0; i < pages.length; i += 4) {
+    const batch = pages.slice(i, i + 4);
+    const doms = await Promise.all(batch.map((p) => dumpDom(browser, `${base}/?audit=1#${p}`, path.join(tmp, `ui-m-${p}`), MOBILE)));
+    for (const [j, p] of batch.entries()) {
+      let why = uiProblems(doms[j], p);
+      if (why.length) why = uiProblems(await dumpDom(browser, `${base}/?audit=1#${p}`, path.join(tmp, `ui-m-${p}-2`), MOBILE), p);
+      ok(!why.length, `móvil: ${p}${why.length ? `: ${why.join(", ")}` : ""}`);
     }
   }
   // Idioma: la primera vez pregunta; en inglés las páginas se traducen y siguen sin errores
