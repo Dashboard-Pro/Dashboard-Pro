@@ -231,8 +231,9 @@ function estimateTag(r) {
   if (r.estimate === "type") {
     const pk = p.pick;
     const lines = p.groups.map((g) => `${g === pk.group ? "▸ " : ""}${g.label}: ${g.floors.length ? `${g.floors.length} a la venta desde ${fmt(g.floor)}` : "ninguno a la venta"}, ${g.sales.length ? `${g.sales.length} venta${g.sales.length === 1 ? "" : "s"} (mediana ${fmt(g.median)})` : "sin ventas"}.`).join(" ");
-    const how = pk.basis === "ventas" ? `mediana de ventas de ${pk.group.label}` : `el más barato a la venta de ${pk.group.label}`;
-    return `<span class="tag" data-tip="${esc(`Valorado por su boost|Tu pet: ${petBoostText(p) || "sin boost"}. Sin listados ni ventas propias, vale ${fmt(pk.value)} FLOWER: ${how}. ${lines}|nivel del pet y rasgos visuales no incluidos · ventas = última venta de cada pet del informe`)}">${pk.basis === "ventas" ? "ventas" : "floor"} ${esc(pk.group.key === "t" ? p.type : pk.group.key === "ab" ? "mismo boost" : pk.group.label)}</span>`;
+    const lvTxt = pk.level ? ` de nivel ${pk.level.from}–${pk.level.to} (el tuyo es ${pk.level.my}; ${pk.level.n} de ${pk.level.known} con nivel conocido)` : "";
+    const how = pk.basis === "ventas" ? `mediana de ventas de ${pk.group.label}${lvTxt}` : `el más barato a la venta de ${pk.group.label}${lvTxt}`;
+    return `<span class="tag" data-tip="${esc(`Valorado por su boost|Tu pet: ${petBoostText(p) || "sin boost"}. Sin listados ni ventas propias, vale ${fmt(pk.value)} FLOWER: ${how}. ${lines}|${pk.level ? "por nivel parecido al tuyo" : "sin nivel: el de los pets del mercado se va guardando poco a poco"} · rasgos visuales no incluidos · ventas = última venta de cada pet del informe`)}">${pk.basis === "ventas" ? "ventas" : "floor"} ${esc(pk.group.key === "t" ? p.type : pk.group.key === "ab" ? "mismo boost" : pk.group.label)}</span>`;
   }
   return `<span class="tag" data-tip="Precio estimado|No tiene listados ni ventas propias: se valora al floor de la colección (el ${colOf(r.key) === "pets" ? "pet" : "bud"} más barato a la venta). Uno con mejores rasgos puede valer bastante más.|">floor colección</span>`;
 }

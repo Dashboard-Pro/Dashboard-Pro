@@ -144,6 +144,8 @@ const LOADERS = {
     return { map, updatedAt: d.updatedAt };
   }, 3600_000),
   fx: () => load("fx", () => api("/api/ext/exchange"), 900_000),
+  // Nivel de los pets NFT del mercado (para valorar el tuyo con los de nivel parecido)
+  petLevels: () => load("petLevels", () => api("/api/pet-levels"), 3600_000),
   // Listados de OpenSea (el servidor usa su key; cada item: precio unitario más bajo en USD y WETH)
   opensea: () => load("opensea", () => api("/api/ext/opensea"), 1800_000),
   friends: () => load("friends", () => api("/api/friends"), 60_000),

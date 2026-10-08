@@ -530,6 +530,7 @@ async function cloudChecks(localPost, localFarm) {
     const many = (await req("/api/prices?keys=collectibles-601,collectibles-999999")).json?.series;
     ok(many?.["collectibles-601"]?.length >= 1 && Array.isArray(many?.["collectibles-999999"]), "precios de varios items en una petición");
     ok((await req("/api/prices?keys=_col-pets")).json?.series?.["_col-pets"]?.[0]?.floor > 0, "floor diario de la colección de pets");
+    ok((await req("/api/prices?keys=collectibles-1999")).json?.series?.["collectibles-1999"]?.slice(-1)[0]?.floor === 220, "un anuncio trampa (floor 10× la última venta) no cuenta como precio");
     ok((await req("/api/prices?keys=_pet-Griffin")).json?.series?.["_pet-Griffin"]?.[0]?.floor === 900, "floor diario por tipo de pet");
 
     section("Rescate de compras antiguas");
@@ -600,6 +601,7 @@ async function cloudChecks(localPost, localFarm) {
       ok(s?.farms === 4 && s.skipped === 1, "cuenta las granjas y se salta las de la lista negra");
       ok(s.metrics?.level?.length === 101 && s.items?.Wood?.[1] === 4, "percentiles por métrica y suministro por item");
       ok(s.me?.metrics?.level > 0 && s.me.pct.level >= 0 && s.groups[`${s.me.island}|${s.me.band}`]?.n >= 1, "tu granja, tu posición y tu grupo");
+      ok(Array.isArray(s.peers) && s.peers.every((p) => p.id && p.worth >= 0 && Array.isArray(p.boosts)) && !s.peers.some((p) => String(p.id) === String(s.me.id)), "granjas de tu grupo con más patrimonio (sin ti) para compararte");
       ok(s.friends?.["3"]?.metrics?.level === 40 && s.friends["3"].pct.level >= 0 && s.friends["3"].boosts.includes("Fairy Circle") && !s.friends["4"], "tus amigos salen en el resumen con su posición y boosts");
       ok(Object.keys(s.groups).some((k) => s.groups[k].boosts["Fairy Circle"]) && !Object.values(s.groups).some((g) => g.boosts.Wood), "boosts por grupo (sin recursos)");
     }
@@ -618,11 +620,16 @@ async function cloudChecks(localPost, localFarm) {
       const { spawnSync } = require("node:child_process");
       const bgData = path.join(tmp, "bg-data");
       const env = { ...process.env, SFL_API_KEY: "sfl.demo", SFL_FARM_ID: "29411", SFL_MIN_GAP_MS: "150", SFL_UPSTREAM: `http://127.0.0.1:${MOCK}/community`,
-        SFL_WORLD: `http://127.0.0.1:${MOCK}/world`, SFL_DUMP_CDN: `http://127.0.0.1:${MOCK}/cdn`, SFL_CONFIG: path.join(tmp, "bg-config.json"), SFL_DATA_DIR: bgData };
+        SFL_WORLD: `http://127.0.0.1:${MOCK}/world`, SFL_DUMP_CDN: `http://127.0.0.1:${MOCK}/cdn`, SFL_CONFIG: path.join(tmp, "bg-config.json"), SFL_DATA_DIR: bgData, SFL_PET_PAUSE_MS: "0" };
       const run = (port) => spawnSync(process.execPath, [path.join(__dirname, "background-run.js")], { env: { ...env, PORT: String(port) }, encoding: "utf8", timeout: 60_000 });
       const closed = run(4202);
       ok(closed.status === 0 && fs.existsSync(path.join(bgData, "trades-121500.json")) && fs.readdirSync(bgData).some((f) => /^prices-\d{4}-\d{2}\.json$/.test(f)),
         "con el dashboard cerrado guarda tus operaciones y la foto de precios y sale");
+      const pl = (() => { try { return JSON.parse(fs.readFileSync(path.join(bgData, "pet-levels.json"), "utf8")); } catch { return {}; } })();
+      const old = new Date(Date.now() - 10 * 86400_000).toISOString().slice(0, 10);
+      const oldMonth = (() => { try { return JSON.parse(fs.readFileSync(path.join(bgData, `prices-${old.slice(0, 7)}.json`), "utf8")); } catch { return {}; } })();
+      ok(Object.keys(oldMonth[old] || {}).length > 10, "histórico largo: recupera días antiguos del mercado hacia atrás");
+      ok(pl["1"]?.level === 11 && pl["2513"]?.level === 10 + (2513 % 40) && pl["1"].at > 0, "guarda el nivel de los pets del mercado (data/pet-levels.json)");
       const open = run(PORT); // el puerto de la demo está ocupado = dashboard abierto
       ok(open.status === 0 && /Nada que hacer/.test(open.stdout), "con el dashboard abierto no hace nada (ya lo hace él)");
     }

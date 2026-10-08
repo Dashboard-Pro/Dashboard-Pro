@@ -152,6 +152,8 @@ function createNightly({ dataDir, publicDir, fetchData, getConfig, log = () => {
 
       const vals = Object.fromEntries(Object.keys(METRICS).map((k) => [k, []]));
       const groups = {}; // "isla|tramo" → { n, vals, boosts }
+      // Las 15 granjas con más patrimonio de cada grupo (isla|tramo): se guardan las de TU grupo para compararte con granjas concretas
+      const peers = {};
       const items = {}, wearables = {};
       const islands = {}, factions = {};
       let farms = 0, skipped = 0, vip = 0, active1 = 0, active7 = 0, mine = null;
@@ -236,6 +238,13 @@ function createNightly({ dataDir, publicDir, fetchData, getConfig, log = () => {
         g.n++;
         for (const k in g.vals) g.vals[k].push(m[k]);
         for (const n of owned) g.boosts[n] = (g.boosts[n] || 0) + 1;
+        const pl = (peers[key] ||= []);
+        if (pl.length < 16 || m.worth > pl[pl.length - 1].worth) {
+          pl.push({ id: o.id, nftId: o.nftId, username: f.username || null, level: m.level, worth: m.worth, expansions: m.expansions, nfts: m.nfts,
+            skills: m.skills, boosts: [...owned], equipped: f.bumpkin?.equipped || null, vip: num(f.vip?.expiresAt) > now });
+          pl.sort((a, b) => b.worth - a.worth);
+          if (pl.length > 16) pl.pop();
+        }
 
         const isMe = me && (String(o.id) === me || String(o.nftId) === me);
         const fid = friendIds.has(String(o.id)) ? String(o.id) : friendIds.has(String(o.nftId)) ? String(o.nftId) : null;
@@ -277,6 +286,7 @@ function createNightly({ dataDir, publicDir, fetchData, getConfig, log = () => {
         raceMine: mine ? (() => { const sc = (ISLE_RANK[mine.island] ?? 0) * 1000 + mine.metrics.expansions; return { rank: raceScores.filter((x) => x > sc).length + 1, score: sc }; })() : null,
         me: mine && ranked(mine),
         friends: Object.fromEntries(Object.entries(friends).map(([k, row]) => [k, ranked(row)])),
+        peers: mine ? (peers[`${mine.island}|${mine.band}`] || []).filter((p) => String(p.id) !== String(mine.id)).slice(0, 15) : null,
       };
       fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(path.join(dir, `${date}.json`), JSON.stringify(out));

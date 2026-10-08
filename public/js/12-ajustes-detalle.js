@@ -133,7 +133,7 @@ async function openItem(key) {
 async function loadEvolution(key, ref, floorNow, buys) {
   const sec = $("#evoSec");
   if (!sec) return;
-  const title = `<h4>Evolución desde tu compra${Legend("profit")}</h4>`;
+  const title = ref != null ? `<h4>Evolución desde tu compra${Legend("profit")}</h4>` : `<h4>Histórico del floor</h4>`;
   try {
     const { series } = await api(`/api/prices?key=${encodeURIComponent(key)}`);
     // La foto de hoy se sustituye por el floor en vivo (no se duplica el día)
@@ -146,9 +146,17 @@ async function loadEvolution(key, ref, floorNow, buys) {
           <span class="${floorNow >= ref ? "up" : "down"}"><b>${pct(((floorNow - ref) / ref) * 100, 1)}</b> precio</span>
           <span class="${floorNow * net >= ref ? "up" : "down"}">${pct(((floorNow * net - ref) / ref) * 100, 1)} si vendes${S.p2pTax ? " (−10%)" : ""}</span>
           ${since ? `<span class="faint">desde ${dateShort(since)}</span>` : ""}</div>`
-      : `<div class="ctx" style="padding:0 24px 10px">${ref == null ? "No hay precio de compra: ponlo en Mercado → Mi inventario para compararlo." : ""}</div>`;
+      : ref == null && pts.length >= 2 && floorNow
+        // Sin compra: cuánto ha cambiado el floor en 30 y 90 días y desde el primer día guardado (histórico largo del mercado)
+        ? `<div class="evo-sum">${[[30, "30 días"], [90, "90 días"], [Infinity, `desde ${dateShort(pts[0].t)}`]].map(([d, l]) => {
+            const back = d === Infinity ? pts[0] : pts.find((p) => p.t >= now() - d * 86400_000);
+            if (!back || (d !== Infinity && now() - back.t < d * 0.8 * 86400_000)) return "";
+            const ch = ((floorNow - back.v) / back.v) * 100;
+            return `<span class="${ch >= 0 ? "up" : "down"}">${l}: <b>${pct(ch, 1)}</b> <span class="faint">(${fmt(back.v)})</span></span>`;
+          }).join("")}<span class="faint">sin precio de compra: ponlo en Mercado → Mi inventario</span></div>`
+        : `<div class="ctx" style="padding:0 24px 10px">${ref == null ? "No hay precio de compra: ponlo en Mercado → Mi inventario para compararlo." : ""}</div>`;
     if (pts.length < 2) {
-      sec.innerHTML = title + summary + `<div class="ctx" style="padding:0 24px 14px">El gráfico se irá llenando: el dashboard guarda el floor de este item cada día mientras el servidor esté encendido.</div>`;
+      sec.innerHTML = title + summary + `<div class="ctx" style="padding:0 24px 14px">El gráfico se irá llenando: el dashboard guarda el floor de cada item cada día y recupera poco a poco los meses anteriores del mercado.</div>`;
       return;
     }
     sec.innerHTML = title + summary + `<div class="chart">${evoChart(pts, ref, buys)}</div>`;

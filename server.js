@@ -575,6 +575,45 @@ function gameData() {
   } catch { return null; }
 }
 const petTraits = () => gameData()?.petNfts || null;
+
+// ── Nivel de los pets NFT del mercado ───────────────────────────────────────
+// El informe del mercado da el precio de cada pet pero no su nivel; la API oficial lo da pet a pet (type=pets&id=…).
+// Se rellena poco a poco como trabajo de fondo (30 por tanda, primero los que están a la venta) en data/pet-levels.json
+// = { id: { level, at } }; los listados se refrescan cada semana y el resto cada mes. Así el dashboard valora tu pet con los
+// del mismo boost y nivel parecido.
+const petLevelsFile = () => path.join(DATA_DIR, "pet-levels.json");
+function readPetLevels() { try { return JSON.parse(fs.readFileSync(petLevelsFile(), "utf8")); } catch { return {}; } }
+let petLevelsBusy = false;
+// La consulta de pets se frena antes que las demás (429): 30 por tanda, 8 s extra entre una y otra y, si frena, se para.
+const PET_LEVEL_PAUSE_MS = Number(process.env.SFL_PET_PAUSE_MS ?? 8000);
+async function refreshPetLevels(max = 30) {
+  if (petLevelsBusy || !config.apiKey) return 0;
+  petLevelsBusy = true;
+  try {
+    const a = await cached("data:type=marketplaceActivity", `${UPSTREAM}/data?type=marketplaceActivity`, TTL.marketplaceActivity);
+    if (a.status !== 200) return 0;
+    const [, report] = Object.entries(JSON.parse(a.body).data?.reports || {}).sort().pop() || [];
+    const levels = readPetLevels(), t = Date.now();
+    const cand = Object.entries(report?.items || {}).map(([k, it]) => ({ id: k.match(/^pets-(\d+)$/)?.[1], listed: it.floor > 0 && it.listingCount > 0, sold: it.latestSale > 0 }))
+      .filter((x) => x.id && (x.listed || x.sold));
+    const stale = (x) => { const l = levels[x.id]; return !l || t - l.at > (x.listed ? 7 : 30) * 86400_000; };
+    const todo = cand.filter(stale).sort((x, y) => Number(y.listed) - Number(x.listed) || (levels[x.id]?.at ?? 0) - (levels[y.id]?.at ?? 0)).slice(0, max);
+    let n = 0;
+    for (const x of todo) {
+      const params = new URLSearchParams([["id", x.id], ["type", "pets"]]);
+      const r = await cached(`data:${params}`, `${UPSTREAM}/data?${params}`, 24 * 3600_000);
+      if (r.status === 429) break; // la API pide calma: se sigue en la próxima tanda
+      if (PET_LEVEL_PAUSE_MS) await sleep(PET_LEVEL_PAUSE_MS);
+      if (r.status !== 200) continue;
+      let lv = null;
+      try { lv = JSON.parse(r.body)?.data?.level?.level; } catch { /* respuesta ilegible */ }
+      if (lv > 0) { levels[x.id] = { level: lv, at: Date.now() }; n++; }
+    }
+    if (n) { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(petLevelsFile(), JSON.stringify(levels)); }
+    if (n) console.log(`  [pets] nivel de ${n} pets del mercado guardado (${Object.keys(levels).length} en total)`);
+    return n;
+  } finally { petLevelsBusy = false; }
+}
 // Tus listados activos (de tu granja en caché) → { "pets-499": precio por unidad }. No son precio de
 // mercado: si el floor del día es tu propio listado, no se guarda como floor.
 function ownListingPrices() {
@@ -592,6 +631,9 @@ function ownListingPrices() {
   } catch { /* sin granja en caché: no se filtra nada */ }
   return out;
 }
+// Anuncios "trampa": un floor más de 10 veces la última venta (p. ej. 99.999.999.999.999 en un item que se vendió a 220) no es
+// precio de mercado: se usa la última venta. Sin esto, quien tiene ese item sale con un patrimonio absurdo.
+const saneFloor = (it) => (it?.floor > 0 && it.latestSale > 0 && it.floor > 10 * it.latestSale ? it.latestSale : it?.floor);
 const isOwnFloor = (own, key, it) => own[key] != null && it.floor > 0 && Math.abs(it.floor - own[key]) <= own[key] * 1e-6;
 // Cada informe nuevo del mercado: foto diaria de precios y, en la nube, revisión de alertas premium
 let lastAlertCheck = 0;
@@ -605,31 +647,21 @@ function onMarket(body) {
     cloud.checkAlerts(report?.items).catch(() => {});
   } catch { /* informe ilegible: se revisará en el siguiente */ }
 }
-function recordPrices(body) {
-  if (Date.now() - lastPriceWrite < 10 * 60_000) return;
-  let d;
-  try { d = JSON.parse(body).data; } catch { return; }
-  const [date, report] = Object.entries(d?.reports || {}).sort().pop() || [];
-  if (!date || !report?.items) return;
-  const file = path.join(DATA_DIR, `prices-${date.slice(0, 7)}.json`);
-  let month = {};
-  try { month = JSON.parse(fs.readFileSync(file, "utf8")); } catch { /* mes nuevo */ }
+// Foto de un día de mercado: floor (o última venta) de cada item, floor de pets/buds y valor de cada grupo de pets con el mismo
+// boost (tipo, tipo+aura, aura+collar, los tres; con los rasgos de gamedata.js: mediana de ventas si hay 3 o más, si no el
+// más barato a la venta; misma regla que usa el dashboard para valorar tu pet). own = tus listados (no son precio de mercado).
+function dayFromReport(report, flowerPrice, own = {}) {
   const day = {};
-  const own = ownListingPrices();
   for (const [key, it] of Object.entries(report.items)) {
     // Si el floor es tu propio listado, vale la última venta (o nada)
-    const p = isOwnFloor(own, key, it) ? it.latestSale : it.floor ?? it.latestSale;
+    const p = isOwnFloor(own, key, it) ? it.latestSale : saneFloor(it) ?? it.latestSale;
     if (p) day[key] = Number(p.toPrecision(6));
   }
-  day._flower = d.flowerPrice;
-  // Pets y buds son únicos: se guarda también el floor de cada colección (el más barato a la venta)
+  if (flowerPrice) day._flower = flowerPrice;
   for (const col of ["pets", "buds"]) {
     const floors = Object.entries(report.items).filter(([k, it]) => k.startsWith(col + "-") && it.floor > 0 && !isOwnFloor(own, k, it)).map(([, it]) => it.floor);
     if (floors.length) day[`_col-${col}`] = Math.min(...floors);
   }
-  // …y el valor de cada grupo de pets con el mismo boost (tipo, tipo+aura, aura+collar, los tres), con
-  // los rasgos de gamedata.js: mediana de ventas si hay 3 o más, si no el más barato a la venta.
-  // Misma regla que usa el dashboard para valorar tu pet, así su gráfico sigue a su grupo.
   const pets = petTraits();
   if (pets) {
     const groups = {};
@@ -651,10 +683,65 @@ function recordPrices(body) {
       if (v) { day[`_pet-${sid}`] = v; day[`_petn-${sid}`] = g.n; } // _petn: cuántos pets forman el grupo
     }
   }
-  month[date] = day;
+  return day;
+}
+function recordPrices(body) {
+  if (Date.now() - lastPriceWrite < 10 * 60_000) return;
+  let d;
+  try { d = JSON.parse(body).data; } catch { return; }
+  const [date, report] = Object.entries(d?.reports || {}).sort().pop() || [];
+  if (!date || !report?.items) return;
+  const file = path.join(DATA_DIR, `prices-${date.slice(0, 7)}.json`);
+  let month = {};
+  try { month = JSON.parse(fs.readFileSync(file, "utf8")); } catch { /* mes nuevo */ }
+  month[date] = dayFromReport(report, d.flowerPrice, ownListingPrices());
   fs.mkdirSync(DATA_DIR, { recursive: true });
   fs.writeFileSync(file, JSON.stringify(month));
   lastPriceWrite = Date.now();
+}
+
+// ── Histórico largo del mercado ─────────────────────────────────────────────
+// La API oficial guarda el informe de cada día (desde finales de 2025): se rellena la foto diaria de precios HACIA ATRÁS
+// desde el primer día guardado, 30 días por tanda como trabajo de fondo. Para al encontrar 3 días seguidos vacíos y lo
+// apunta en data/prices-meta.json. Los días que ya existen no se tocan.
+let backfillBusy = false;
+async function backfillPrices(maxDays = 30) {
+  if (backfillBusy || !config.apiKey || CLOUD) return 0;
+  backfillBusy = true;
+  try {
+    const metaFile = path.join(DATA_DIR, "prices-meta.json");
+    let meta = {};
+    try { meta = JSON.parse(fs.readFileSync(metaFile, "utf8")); } catch { /* aún no */ }
+    if (meta.complete) return 0;
+    const files = (() => { try { return fs.readdirSync(DATA_DIR).filter((x) => /^prices-\d{4}-\d{2}\.json$/.test(x)).sort(); } catch { return []; } })();
+    if (!files.length) return 0; // sin foto de hoy aún: primero que se guarde algo
+    const firstMonth = JSON.parse(fs.readFileSync(path.join(DATA_DIR, files[0]), "utf8"));
+    let t = Date.parse(Object.keys(firstMonth).sort()[0] + "T00:00:00Z") - 86400_000;
+    const months = {}, read = (ym) => (months[ym] ||= (() => { try { return JSON.parse(fs.readFileSync(path.join(DATA_DIR, `prices-${ym}.json`), "utf8")); } catch { return {}; } })());
+    let n = 0, empty = 0;
+    while (n < maxDays) {
+      const date = new Date(t).toISOString().slice(0, 10);
+      const r = await cached(`data:date=${date}&type=marketplaceActivity`, `${UPSTREAM}/data?date=${date}&type=marketplaceActivity`, TTL.marketplaceActivityPast);
+      if (r.status !== 200) break; // la API falla o frena: se sigue en la próxima tanda
+      if (PET_LEVEL_PAUSE_MS) await sleep(PET_LEVEL_PAUSE_MS + 2000); // informes pesados: calma entre uno y otro
+      let d = null;
+      try { d = JSON.parse(r.body).data; } catch { break; }
+      const rep = d?.reports?.[date];
+      if (!rep || !Object.keys(rep.items || {}).length) {
+        if (++empty >= 3) { meta = { complete: true, earliest: new Date(t + 3 * 86400_000).toISOString().slice(0, 10), at: Date.now() }; break; }
+      } else {
+        empty = 0;
+        const month = read(date.slice(0, 7));
+        if (!month[date]) { month[date] = dayFromReport(rep, d.flowerPrice); n++; }
+      }
+      t -= 86400_000;
+    }
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    for (const [ym, month] of Object.entries(months)) fs.writeFileSync(path.join(DATA_DIR, `prices-${ym}.json`), JSON.stringify(month));
+    if (meta.complete || n) fs.writeFileSync(metaFile, JSON.stringify(meta.complete ? meta : { ...meta, at: Date.now() }));
+    if (n) console.log(`  [precios] ${n} días antiguos del mercado recuperados${meta.complete ? ` (completo desde ${meta.earliest})` : ""}`);
+    return n;
+  } finally { backfillBusy = false; }
 }
 // Serie diaria de varios items leyendo cada archivo mensual una sola vez → { key: [{date, floor}] }
 function priceSeriesMany(keys) {
@@ -1070,6 +1157,9 @@ async function handleApi(req, res, url) {
     return send(res, 200, { ok: true, days: Object.keys(doc).length });
   }
 
+  // Nivel de los pets NFT del mercado (data/pet-levels.json): el dashboard valora tu pet con los de nivel parecido
+  if (p === "/api/pet-levels") return send(res, 200, readPetLevels());
+
   if (p === "/api/prices") {
     const many = url.searchParams.get("keys");
     if (many) {
@@ -1296,6 +1386,8 @@ async function backgroundPass() {
   const t0 = Date.now();
   try {
     await backgroundArchive();
+    await refreshPetLevels(20).catch(() => 0);
+    await backfillPrices(30).catch(() => 0);
     if (nightly && config.nightlyDump && config.apiKey) {
       const s = await nightly.ingest();
       if (s.lastError) console.log(`  Volcado: ${s.lastError.message}`);
@@ -1350,6 +1442,14 @@ server.listen(config.port, CLOUD ? process.env.HOST || "0.0.0.0" : "127.0.0.1", 
   }
   setTimeout(() => inBackground(() => backgroundArchive()).catch(() => {}), 15_000);
   setInterval(() => inBackground(() => backgroundArchive()).catch(() => {}), 20 * 60_000);
+  // Nivel de los pets del mercado, poco a poco y por detrás de todo lo demás
+  if (!CLOUD) {
+    setTimeout(() => inBackground(() => refreshPetLevels()).catch(() => {}), 90_000);
+    setInterval(() => inBackground(() => refreshPetLevels()).catch(() => {}), 20 * 60_000);
+    // Histórico largo del mercado: días antiguos hacia atrás, 30 por tanda
+    setTimeout(() => inBackground(() => backfillPrices()).catch(() => {}), 150_000);
+    setInterval(() => inBackground(() => backfillPrices()).catch(() => {}), 20 * 60_000);
+  }
   if (cloudClient) {
     setTimeout(() => cloudClient.sync().catch(() => {}), 20_000);
     setInterval(() => cloudClient.sync().catch(() => {}), 10 * 60_000);

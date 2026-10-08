@@ -51,12 +51,19 @@ const PET_AURA_BOOST = { "Common Aura": "1,5× energía", "Rare Aura": "2× ener
 const PET_BIB_BOOST = { Collar: "+5 XP por comida", "Gold Necklace": "+10 XP por comida" };
 const petBoostText = (t) => [PET_AURA_BOOST[t.aura], PET_BIB_BOOST[t.bib]].filter(Boolean).join(" · ");
 
+// Anuncios "trampa": un floor más de 10 veces la última venta (99.999.999.999.999 en un item vendido a 220) no es precio de
+// mercado para valorar: se usa la última venta. (La tabla del mercado sigue mostrando el floor real.)
+const saneFloor = (it) => (it?.floor > 0 && it.latestSale > 0 && it.floor > 10 * it.latestSale ? it.latestSale : it?.floor);
+
 // Valor de un pet sin precio propio, comparándolo con los del mercado que tienen el mismo boost.
 // Grupos del más parecido al más general; se usa el primero con datos suficientes: la mediana de
 // ventas si hay 3 o más, o el listado más barato (salvo en el grupo general de solo tipo).
-function petTypeRef(items, id) {
+// Con el nivel de los pets del mercado (data/pet-levels.json, lo rellena el servidor poco a poco) y el de tu pet, dentro
+// del grupo elegido se comparan solo los de nivel parecido (±25%, mínimo ±5; si hay menos de 3, los 3 más cercanos).
+function petTypeRef(items, id, myLevel = null) {
   const me = petTraitsOf(id);
   if (!me) return null;
+  const lvOf = (pid) => store.petLevels?.data?.[pid]?.level ?? null;
   // sid = clave de la serie diaria que guarda el servidor para ese grupo (petGroupIds en server.js)
   const groups = [
     { key: "tab", sid: `${me.type}|${me.aura}|${me.bib}`, label: `${me.type} + ${me.aura} + ${me.bib}`, match: (t) => t.type === me.type && t.aura === me.aura && t.bib === me.bib },
@@ -64,13 +71,17 @@ function petTypeRef(items, id) {
     { key: "ab", sid: `*|${me.aura}|${me.bib}`, label: `${me.aura} + ${me.bib} (mismo boost, cualquier tipo)`, match: (t) => t.aura === me.aura && t.bib === me.bib },
     { key: "ta", sid: `${me.type}|${me.aura}`, label: `${me.type} + ${me.aura}`, match: (t) => t.type === me.type && t.aura === me.aura },
     { key: "t", sid: me.type, label: `${me.type}`, match: (t) => t.type === me.type },
-  ].map((g) => ({ ...g, floors: [], sales: [] }));
+  ].map((g) => ({ ...g, floors: [], sales: [], floorsL: [], salesL: [] }));
   for (const [k, it] of Object.entries(items)) {
     const m = k.match(/^pets-(\d+)$/);
     if (!m || m[1] === String(id)) continue;
     const tr = petTraitsOf(m[1]);
     if (!tr) continue;
-    for (const g of groups) if (g.match(tr)) { if (it.floor > 0) g.floors.push(it.floor); if (it.latestSale > 0) g.sales.push(it.latestSale); }
+    const lv = lvOf(m[1]);
+    for (const g of groups) if (g.match(tr)) {
+      if (it.floor > 0) { g.floors.push(it.floor); if (lv) g.floorsL.push({ p: it.floor, lv }); }
+      if (it.latestSale > 0) { g.sales.push(it.latestSale); if (lv) g.salesL.push({ p: it.latestSale, lv }); }
+    }
   }
   for (const g of groups) {
     g.sales.sort((a, b) => a - b);
@@ -84,6 +95,18 @@ function petTypeRef(items, id) {
   }
   const typeG = groups[3];
   if (!pick && typeG.floor != null) pick = { group: typeG, value: typeG.floor, basis: "listado" };
+  // Por nivel: dentro del grupo elegido, los de nivel parecido al tuyo
+  if (pick && myLevel > 0) {
+    const g = pick.group, span = Math.max(5, Math.round(myLevel * 0.25));
+    const near = (list) => { const close = list.filter((e) => Math.abs(e.lv - myLevel) <= span); return close.length >= 3 ? close : [...list].sort((a, b) => Math.abs(a.lv - myLevel) - Math.abs(b.lv - myLevel)).slice(0, 3); };
+    if (pick.basis === "ventas" && g.salesL.length >= 3) {
+      const s = near(g.salesL).sort((a, b) => a.p - b.p);
+      pick = { ...pick, value: s[s.length >> 1].p, level: { my: myLevel, n: s.length, from: Math.min(...s.map((e) => e.lv)), to: Math.max(...s.map((e) => e.lv)), known: g.salesL.length, total: g.sales.length } };
+    } else if (pick.basis === "listado" && g.floorsL.length) {
+      const s = near(g.floorsL);
+      pick = { ...pick, value: Math.min(...s.map((e) => e.p)), level: { my: myLevel, n: s.length, from: Math.min(...s.map((e) => e.lv)), to: Math.max(...s.map((e) => e.lv)), known: g.floorsL.length, total: g.floors.length } };
+    }
+  }
   return { ...me, groups, pick, typeFloor: pick?.value ?? null };
 }
 
@@ -105,7 +128,7 @@ function holdings() {
   const mine = myListings();
   const marketFloor = (it, name) => {
     const l = mine[name];
-    return l && it?.floor != null && toNum(it.listingCount) <= l.count && it.floor >= l.unit - 1e-9 ? null : it?.floor;
+    return l && it?.floor != null && toNum(it.listingCount) <= l.count && it.floor >= l.unit - 1e-9 ? null : saneFloor(it);
   };
   const push = (name, qty, key) => {
     const it = items[key];
@@ -136,7 +159,7 @@ function holdings() {
     return f.length ? Math.min(...f) : null;
   };
   const uniques = [
-    ...Object.values(farm.pets?.nfts || {}).map((p) => ({ col: "pets", id: p.id, traits: p.traits })),
+    ...Object.values(farm.pets?.nfts || {}).map((p) => ({ col: "pets", id: p.id, traits: p.traits, xp: toNum(p.experience) })),
     ...Object.entries(farm.buds || {}).map(([id, b]) => ({ col: "buds", id: b.id ?? id, traits: b })),
   ];
   for (const u of uniques) {
@@ -144,7 +167,7 @@ function holdings() {
     const own = marketFloor(it, itemName(key)) ?? it?.latestSale;
     // Sin precio propio: un pet se valora al floor de los de su mismo tipo (un Dragon por los Dragon
     // listados); si no hay ninguno de su tipo, o es un bud, al de toda la colección
-    const ref = u.col === "pets" && own == null ? petTypeRef(items, u.id) : null;
+    const ref = u.col === "pets" && own == null ? petTypeRef(items, u.id, u.xp != null ? petLevel(u.xp).lvl : null) : null;
     const byType = ref?.typeFloor != null;
     const price = own ?? (byType ? ref.typeFloor : colFloor(items, u.col));
     if (!price) continue;

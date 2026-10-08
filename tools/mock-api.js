@@ -172,6 +172,8 @@ function activity(prev) {
   items[`wearables-${G.wearableIds["Red Farmer Shirt"]}`] = { volume: 300, trades: 12, quantity: 12, latestSale: 3.5, floor: 3.2, listingCount: 4, offerCount: 1, bestOffer: 2.9 };
   items["pets-2513"] = { volume: 0, trades: 0, quantity: 0, floor: 45, listingCount: 2, offerCount: 0 };
   items["pets-1"] = { volume: 0, trades: 0, quantity: 0, floor: 900, listingCount: 1, offerCount: 0 }; // Griffin
+  // Anuncio "trampa": floor absurdo en un item que se vendió a 220 (no debe valer como precio)
+  items["collectibles-1999"] = { volume: 220, trades: 1, quantity: 1, latestSale: 220, floor: 99999999999999, listingCount: 1, offerCount: 0 };
   return { totals: { volume: prev ? 7.5e7 : 7.52e7, trades: prev ? 1.53e7 : 1.5312e7 }, items };
 }
 
@@ -190,6 +192,13 @@ function handle(url) {
   }
   const type = url.searchParams.get("type");
   switch (type) {
+    // Un pet NFT con su nivel (para valorar los pets por nivel)
+    case "pets": {
+      const id = Number(url.searchParams.get("id"));
+      if (!id) return {};
+      const level = 10 + (id % 40);
+      return { data: { id, name: `Pet #${id}`, level: { level, currentProgress: 0, nextLevelXP: 50 * level * (level + 1) }, experience: 50 * (level - 1) * level } };
+    }
     case "marketplaceActivity": {
       const date = url.searchParams.get("date") || day();
       return { data: { flowerPrice: 0.13458, reports: { [date]: activity(Boolean(url.searchParams.get("date"))) } } };

@@ -46,6 +46,28 @@ function wDumpMe() {
     }).join("")}
   </tbody></table></div><div class="mod-f"><span>Tu grupo = misma isla y mismo tramo de nivel · datos de anoche (tu fila también)</span><span>patrimonio = saldo + inventario y wearables a floor</span></div>`;
 }
+// Granjas concretas de tu grupo (isla + tramo de nivel) con más patrimonio: qué boosts tienen que tú no y ver su granja
+function wDumpPeers() {
+  const d = store.dump.data;
+  if (!d?.me) return Empty("friends", "Sin datos", "");
+  if (!d.peers) return Empty("friends", "Aún no", "Saldrán con el próximo volcado nocturno procesado (Ajustes → Datos de la comunidad → Procesar ahora).");
+  const me = d.me, farm = has("farm") ? store.farm.data.farm : null;
+  const mine = new Set(me.boosts), own = (n) => mine.has(n) || (farm && (toNum(farm.inventory?.[n]) > 0 || toNum(farm.wardrobe?.[n]) > 0));
+  const g = d.groups[`${me.island}|${me.band}`];
+  setSub("cm-peers", `las ${d.peers.length} con más patrimonio de tu grupo (isla ${esc(ISLAND_ES[me.island] || me.island)} · ${esc(bandLabel(me.band))}) · tú: ${fmt(me.metrics.worth, 0)} FLOWER`);
+  if (!d.peers.length) return Empty("friends", "Sin granjas", "");
+  return `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Granja</th><th class="r">Nivel</th><th class="r">Patrimonio</th><th class="r">Expansiones</th><th class="r">NFTs</th><th>Boosts que tiene y tú no</th><th></th></tr></thead><tbody>
+    ${d.peers.map((p) => {
+      const extra = p.boosts.filter((n) => !own(n) && !TEMP_BOOST.test(n))
+        .sort((a, b) => (g?.boosts?.[a] || 0) - (g?.boosts?.[b] || 0)).slice(0, 4); // primero los menos comunes: lo que les distingue
+      return `<tr><td class="w">${Player(p.username || `#${p.id}`, p.equipped, p.id)}${p.vip ? ` <span class="tag sun">VIP</span>` : ""}</td>
+        <td class="r">${fmt(p.level, 0)}</td><td class="r"><b>${fmt(p.worth, 0)}</b> <span class="faint">${me.metrics.worth ? `×${fmt(p.worth / me.metrics.worth, 1)}` : ""}</span></td>
+        <td class="r">${fmt(p.expansions, 0)}</td><td class="r dim">${fmt(p.nfts, 0)}</td>
+        <td class="ctx">${extra.length ? extra.map((n) => `${Gi(n, 14)} ${esc(n)}`).join(" · ") : "—"}</td>
+        <td><a class="btn sm ghost" href="${esc(viewFarmUrl(p.id))}">Ver su granja</a></td></tr>`;
+    }).join("")}
+  </tbody></table></div><div class="mod-f"><span>Del volcado nocturno de ${esc(d.date)} · patrimonio a floor como en el resto del dashboard</span><span>boosts: primero los que menos gente de tu grupo tiene</span></div>`;
+}
 function wDumpBoosts() {
   const d = store.dump.data;
   if (!d?.me) return Empty("bolt", "Sin datos", "");

@@ -63,5 +63,7 @@ $$("[data-sprite]").forEach((i) => (i.outerHTML = sprite(i.dataset.sprite, Numbe
     LOADERS.fx().catch(() => {}); // €: sfl.world, cacheado 15 min
   }, 60_000);
   LOADERS.fx().catch(() => {});
+  // Nivel de los pets del mercado: cuando llega, se repinta lo que valora tus pets (NFTs, patrimonio)
+  LOADERS.petLevels().then(() => repaint("activity")).catch(() => {});
   setInterval(() => LOADERS.status().then(() => repaint("status")).catch(() => {}), 15_000);
 })();

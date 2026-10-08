@@ -279,6 +279,7 @@ const PAGES = {
         ${Mod({ id: "cm-me", span: 7, title: "Tú vs los demás", icon: "trophy", flush: true })}
         ${Mod({ id: "cm-boosts", span: 5, title: "Lo que tienen los jugadores como tú", icon: "bolt", flush: true })}
       </div>
+      <div class="plate">${Mod({ id: "cm-peers", span: 12, title: "Granjas como la tuya que van por delante", icon: "friends", flush: true })}</div>
       <div class="plate">
         ${Mod({ id: "cm-supply", span: 8, title: "Suministro real", icon: "chest", flush: true, act: Seg(SUPPLY_VIEWS, S.supplyView, "supply") })}
         ${Mod({ id: "cm-world", span: 4, title: "Islas y facciones", icon: "globe", cls: "sticky-side" })}
@@ -286,6 +287,7 @@ const PAGES = {
     mount("cm-k", { deps: ["dump"], soft: ["farm"], render: wDumpKpis, loading: "block" });
     mount("cm-me", { deps: ["dump"], render: wDumpMe, loading: "rows" });
     mount("cm-boosts", { deps: ["dump"], soft: ["farm", "activity"], render: wDumpBoosts, loading: "rows" });
+    mount("cm-peers", { deps: ["dump"], soft: ["farm"], render: wDumpPeers, loading: "rows" });
     mount("cm-supply", { deps: ["dump"], soft: ["activity"], render: wDumpSupply, loading: "rows" });
     mount("cm-world", { deps: ["dump"], render: wDumpWorld, loading: "rows" });
   },

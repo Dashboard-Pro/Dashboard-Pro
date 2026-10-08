@@ -252,7 +252,7 @@ function priceBook() {
     else {
       const id = G.itemIds[name], wid = G.wearableIds[name];
       const it = a && (id != null ? a.items[`collectibles-${id}`] : wid != null ? a.items[`wearables-${wid}`] : null);
-      const mp = it && !deadMarket(name) ? it.floor ?? it.latestSale : null;
+      const mp = it && !deadMarket(name) ? saneFloor(it) ?? it.latestSale : null;
       if (mp) { v = mp; src = "mercado"; }
       else if (deadMarket(name)) { v = treasureShopFlw(name); src = v != null ? "tienda" : null; }
       else if (G.recipes[name] && depth < 4) {
