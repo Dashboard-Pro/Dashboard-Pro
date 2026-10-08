@@ -16,6 +16,17 @@ const section = (t) => console.log(`\n${t}`);
 // módulos con error ("state err"), páginas sin dibujar o sin terminar de cargar. Un <img> dentro de un <svg> lo marca
 // el propio dashboard como error de pintado (el navegador lo recoloca y ya no se ve en el HTML). Sin navegador, se omite.
 // Edge en Windows no devuelve el HTML por la consola: se prueba cada uno y se usa el primero que responda
+// Algunas pruebas esperan a un proceso con spawnSync y bloquean el test unos segundos: el servidor cierra mientras tanto la
+// conexión que fetch guardaba para reutilizar y la siguiente petición da ECONNRESET. Se repite una vez (no es un fallo real).
+{
+  const realFetch = global.fetch;
+  global.fetch = async (...args) => {
+    try { return await realFetch(...args); } catch (e) {
+      if (/ECONNRESET|UND_ERR_SOCKET|other side closed/i.test(`${e.cause?.code || ""} ${e.cause?.message || ""}`)) return realFetch(...args);
+      throw e;
+    }
+  };
+}
 const BROWSERS = [process.env.SFL_BROWSER,
   "C:/Program Files/Google/Chrome/Application/chrome.exe", "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe",
   "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe", "C:/Program Files/Microsoft/Edge/Application/msedge.exe",
@@ -530,6 +541,7 @@ async function cloudChecks(localPost, localFarm) {
     const many = (await req("/api/prices?keys=collectibles-601,collectibles-999999")).json?.series;
     ok(many?.["collectibles-601"]?.length >= 1 && Array.isArray(many?.["collectibles-999999"]), "precios de varios items en una petición");
     ok((await req("/api/prices?keys=_col-pets")).json?.series?.["_col-pets"]?.[0]?.floor > 0, "floor diario de la colección de pets");
+    ok((await req("/api/prices?keys=_pet-Dragon")).json?.series?.["_pet-Dragon"]?.slice(-1)[0]?.floor === 820, "pets: una venta rara (1 FLOWER) no cuenta en el valor del grupo");
     ok((await req("/api/prices?keys=collectibles-1999")).json?.series?.["collectibles-1999"]?.slice(-1)[0]?.floor === 220, "un anuncio trampa (floor 10× la última venta) no cuenta como precio");
     ok((await req("/api/prices?keys=_pet-Griffin")).json?.series?.["_pet-Griffin"]?.[0]?.floor === 900, "floor diario por tipo de pet");
 

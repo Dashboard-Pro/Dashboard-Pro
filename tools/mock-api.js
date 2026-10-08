@@ -173,6 +173,9 @@ function activity(prev) {
   items["pets-2513"] = { volume: 0, trades: 0, quantity: 0, floor: 45, listingCount: 2, offerCount: 0 };
   items["pets-1"] = { volume: 0, trades: 0, quantity: 0, floor: 900, listingCount: 1, offerCount: 0 }; // Griffin
   // Anuncio "trampa": floor absurdo en un item que se vendió a 220 (no debe valer como precio)
+  // Tres Dragon vendidos: uno a 1 FLOWER (traspaso entre cuentas), que no debe contar en el valor del grupo
+  { const P = G.petNfts, dragons = Object.keys(P?.ids || {}).filter((id) => P.types[P.ids[id][0]] === "Dragon" && id !== "2513" && id !== "1").slice(0, 3);
+    [800, 820, 1].forEach((p, i) => { if (dragons[i]) items[`pets-${dragons[i]}`] = { volume: p, trades: 1, quantity: 1, latestSale: p, listingCount: 0, offerCount: 0 }; }); }
   items["collectibles-1999"] = { volume: 220, trades: 1, quantity: 1, latestSale: 220, floor: 99999999999999, listingCount: 1, offerCount: 0 };
   return { totals: { volume: prev ? 7.5e7 : 7.52e7, trades: prev ? 1.53e7 : 1.5312e7 }, items };
 }

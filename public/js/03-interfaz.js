@@ -53,6 +53,9 @@ const petBoostText = (t) => [PET_AURA_BOOST[t.aura], PET_BIB_BOOST[t.bib]].filte
 
 // Anuncios "trampa": un floor más de 10 veces la última venta (99.999.999.999.999 en un item vendido a 220) no es precio de
 // mercado para valorar: se usa la última venta. (La tabla del mercado sigue mostrando el floor real.)
+// Ventas raras en un grupo de pets (traspasos a 1 FLOWER entre cuentas propias, precios inflados): con 3 o más ventas, fuera
+// las que están por debajo de 1/5 o por encima de 5 veces la mediana del grupo (misma regla que el servidor).
+const trimSales = (sorted) => { if (sorted.length < 3) return sorted; const m = sorted[sorted.length >> 1]; return sorted.filter((v) => v >= m / 5 && v <= m * 5); };
 const saneFloor = (it) => (it?.floor > 0 && it.latestSale > 0 && it.floor > 10 * it.latestSale ? it.latestSale : it?.floor);
 
 // Valor de un pet sin precio propio, comparándolo con los del mercado que tienen el mismo boost.
@@ -85,12 +88,16 @@ function petTypeRef(items, id, myLevel = null) {
   }
   for (const g of groups) {
     g.sales.sort((a, b) => a - b);
+    const all = g.sales.length;
+    g.sales = trimSales(g.sales);
+    g.dropped = all - g.sales.length; // ventas raras que no cuentan
+    if (g.dropped) { const lo = g.sales[0], hi = g.sales[g.sales.length - 1]; g.salesL = g.salesL.filter((e) => e.p >= lo && e.p <= hi); }
     g.floor = g.floors.length ? Math.min(...g.floors) : null;
     g.median = g.sales.length ? g.sales[g.sales.length >> 1] : null;
   }
   let pick = null;
   for (const g of groups) {
-    if (g.sales.length >= 3) { pick = { group: g, value: g.median, basis: "ventas" }; break; }
+    if (g.sales.length + (g.dropped || 0) >= 3 && g.sales.length) { pick = { group: g, value: g.median, basis: "ventas" }; break; }
     if (g.floor != null && g.key !== "t") { pick = { group: g, value: g.floor, basis: "listado" }; break; }
   }
   const typeG = groups[3];

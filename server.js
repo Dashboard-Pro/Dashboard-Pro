@@ -634,6 +634,9 @@ function ownListingPrices() {
 // Anuncios "trampa": un floor más de 10 veces la última venta (p. ej. 99.999.999.999.999 en un item que se vendió a 220) no es
 // precio de mercado: se usa la última venta. Sin esto, quien tiene ese item sale con un patrimonio absurdo.
 const saneFloor = (it) => (it?.floor > 0 && it.latestSale > 0 && it.floor > 10 * it.latestSale ? it.latestSale : it?.floor);
+// Ventas raras en un grupo de pets (traspasos a 1 FLOWER entre cuentas propias, precios inflados): con 3 o más ventas, fuera
+// las que están por debajo de 1/5 o por encima de 5 veces la mediana del grupo. Misma regla en el dashboard (trimSales).
+const trimSales = (sorted) => { if (sorted.length < 3) return sorted; const m = sorted[sorted.length >> 1]; return sorted.filter((v) => v >= m / 5 && v <= m * 5); };
 const isOwnFloor = (own, key, it) => own[key] != null && it.floor > 0 && Math.abs(it.floor - own[key]) <= own[key] * 1e-6;
 // Cada informe nuevo del mercado: foto diaria de precios y, en la nube, revisión de alertas premium
 let lastAlertCheck = 0;
@@ -678,8 +681,10 @@ function dayFromReport(report, flowerPrice, own = {}) {
       }
     }
     for (const [sid, g] of Object.entries(groups)) {
-      g.sales.sort((a, b) => a - b);
-      const v = g.sales.length >= 3 ? g.sales[g.sales.length >> 1] : g.floors.length ? Math.min(...g.floors) : null;
+      // Hacen falta 3 ventas (contando las raras); el valor sale de las que no son raras
+      const nSales = g.sales.length;
+      g.sales = trimSales(g.sales.sort((a, b) => a - b));
+      const v = nSales >= 3 && g.sales.length ? g.sales[g.sales.length >> 1] : g.floors.length ? Math.min(...g.floors) : null;
       if (v) { day[`_pet-${sid}`] = v; day[`_petn-${sid}`] = g.n; } // _petn: cuántos pets forman el grupo
     }
   }
