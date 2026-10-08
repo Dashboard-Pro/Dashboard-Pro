@@ -9,7 +9,7 @@
    Cada "línea" es algo que produces: un cultivo en tus parcelas, una fruta en tus frutales, una planta del invernadero,
    una semilla en la Crop Machine, una flor (vale por la miel que hace) o un tipo de nodo. Para cada una:
      tiempo  = base del juego × velocidad (medida en tu granja si se puede; si no, con los boosts que tienes)
-     rinde   = unidades por cosecha (sfl.world con todos tus boosts; si no, 1 + los boosts que tienes)
+     rinde   = unidades por cosecha con todos tus boosts (fórmulas del juego, 28-cantidades.js)
      al día  = cosechas al día (el tiempo redondeado a tu ritmo de visitas) × unidades × (rinde × precio − coste)
    Los boosts salen de G.boostFx (textos del juego en inglés: "+0.2 Egg", "x0.5 Tree Recovery Time"…). */
 

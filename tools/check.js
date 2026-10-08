@@ -180,6 +180,30 @@ ok(G.nftCollectibles?.length > 300 && !G.nftCollectibles.includes("Wood") && !G.
 ok(Object.keys(G.diggingFormations || {}).length >= 30 && G.diggingFormations.OLD_BOTTLE?.length === 4 && G.desertGrid?.width === 10, "patrones de excavación del desierto");
 ok(Object.values(G.chapterArtefact || {}).includes("Otter Pebble"), "artefacto de cada capítulo (excavación)");
 {
+  // Cantidades por cosecha/golpe con las fórmulas del juego (28-cantidades.js), con casos sacados del código del juego
+  Object.assign(global, { G, toNum: (v) => Number(v) || 0, now: () => Date.now(), tempActiveNow: () => false,
+    AOE_RANK: [{ xLeft: 3, xRight: 3, depth: 7 }, { xLeft: 4, xRight: 3, depth: 8 }, { xLeft: 4, xRight: 4, depth: 9 }] });
+  const { farmYields } = require("../public/js/28-cantidades.js");
+  const at = (x, y) => [{ coordinates: { x, y }, createdAt: 0 }];
+  const farm = {
+    bumpkin: { skills: { "Tough Tree": 1, "Lumberjack's Extra": 1, "Oil Extraction": 1, "Horror Mike": 1 }, equipped: { shirt: "Crimstone Armor" } },
+    farmHands: { bumpkins: {} }, inventory: {}, island: { type: "desert" }, season: { season: "summer" },
+    collectibles: { "Apprentice Beaver": at(0, 0), Squirrel: at(1, 0), "Knight Chicken": at(2, 0), "Scary Mike": at(7, 11), Macaw: at(3, 0) },
+    trees: { a: { x: 20, y: 20 }, b: { x: 22, y: 20, multiplier: 4, tier: 2 } },
+    oilReserves: { a: { x: 30, y: 30, drilled: 1 } }, crimstones: { a: { x: 40, y: 40, minesLeft: 5 } },
+    crops: { a: { x: 7, y: 9 }, b: { x: 30, y: 9 } },
+  };
+  const y = farmYields(farm);
+  // Madera: ×1.2 castor, Tough Tree ×3 al 10%, +0.1 Lumberjack's Extra, +0.1 Squirrel, +1 al 20%; el árbol forjado ×4 +0.5
+  const w1 = 1.2 * 1.2 + 0.1 + 0.1 + 0.2, w2 = w1 * 4 + 0.5;
+  ok(Math.abs(y.resources.wood.avg - (w1 + w2) / 2) < 1e-3 && Math.abs(y.resources.wood.min - 1.4) < 1e-9, "cantidades: madera con castor, Tough Tree, nodos forjados (getWoodDropAmount)");
+  ok(Math.abs(y.resources.oil.avg - (10 + 20 / 3 + 0.1 + 1)) < 1e-3 && y.resources.oil.max === 31.1, "cantidades: petróleo con su +20 cada tres (getOilDropAmount)");
+  ok(Math.abs(y.resources.crimstone.avg - 1.5) < 1e-9, "cantidades: crimstone con el extra de la última picada (getCrimstoneDropAmount)");
+  // Zanahoria (media): Scary Mike con Horror Mike 1 = zona 7×7 y +0.3 → solo la parcela de dentro
+  ok(Math.abs(y.crops.carrot.avg - 1.15) < 1e-9 && y.crops.carrot.max === 1.3, "cantidades: zonas de efecto parcela a parcela (Scary Mike + Horror Mike)");
+  ok(Math.abs(y.fruits.apple.avg - 1.1) < 1e-9 && y.greenhouse.grape.avg === 1, "cantidades: Macaw en frutas de parcela y no en la uva del invernadero");
+}
+{
   // Solver de excavación con un sitio real (granja 153785, 30-09-2026): 29 hoyos, 924 combinaciones posibles
   const { digSolve, digShape } = require("../public/js/14-herramientas.js");
   const names = ["ARTEFACT_TWENTY_ONE", "ARTEFACT_TWENTY_TWO", "ARTEFACT_FOURTEEN", "HIEROGLYPH", "OLD_BOTTLE", "SEA_CUCUMBERS", "CLAM_SHELLS"];

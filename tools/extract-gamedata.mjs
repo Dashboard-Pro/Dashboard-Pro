@@ -154,6 +154,15 @@ for (const m of skillBody.matchAll(/^ {2}(?:"([^"]+)"|([A-Za-z0-9_]+)):\s*{([\s\
     buffEn: dictEn[get(/\bbuff:\s*{[\s\S]*?shortDescription:\s*translate\("([^"]+)"\)/)] || get(/\bbuff:\s*{[\s\S]*?shortDescription:\s*"([^"]+)"/) || undefined,
     // Valores por nivel de las skills mejorables (upgrade.effect.ranks), si son una lista de números
     ranks: (() => { const r = get(/upgrade:[\s\S]*?\branks:\s*\[([\d.,\s]+)\]/); return r ? r.split(",").map(Number).filter(Number.isFinite) : undefined; })(),
+    // Resto de tablas por rango de upgrade.effect (SKILL_RANKS del juego): buff/debuff (Acre Farm, Zesty Vibes…), aoeYield
+    // (Horror Mike, Laurie's Gains, Chonky Scarecrow) y yield (Greasy Plants). Las usan las cantidades por cosecha/golpe.
+    rankFx: (() => {
+      const up = b.slice(Math.max(0, b.search(/\bupgrade:\s*{/)));
+      if (!/\bupgrade:\s*{/.test(b)) return undefined;
+      const arr = (k) => { const m = up.match(new RegExp(`\\b${k}:\\s*\\[([\\d.,\\s]+)\\]`)); return m ? m[1].split(",").map(Number).filter(Number.isFinite) : undefined; };
+      const o = Object.fromEntries(["buff", "debuff", "aoeYield", "yield"].map((k) => [k, arr(k)]).filter(([, v]) => v?.length));
+      return Object.keys(o).length ? o : undefined;
+    })(),
     // Rango máximo de las skills mejorables (con Ascension Shards), tengan o no valores numéricos por rango
     maxLevel: Number(get(/upgrade:\s*{\s*maxLevel:\s*(\d+)/)) || undefined,
     debuff: tr(get(/debuff:\s*{[\s\S]*?shortDescription:\s*translate\("([^"]+)"\)/)) || get(/debuff:\s*{[\s\S]*?shortDescription:\s*"([^"]+)"/) || undefined,

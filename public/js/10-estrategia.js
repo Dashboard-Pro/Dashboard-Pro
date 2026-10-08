@@ -112,7 +112,7 @@ function boostInventory() {
 }
 
 // Unidades medias por cosecha/golpe con TODOS tus boosts de cantidad (NFTs, skills, zonas de efecto),
-// calculadas por sfl.world. Sin ese dato se asume 1 (lo base).
+// calculadas con las fórmulas del juego (28-cantidades.js). Sin granja se asume 1 (lo base).
 function yieldOf(group, name) {
   const v = store.myBoosts?.data?.[group]?.[String(name).toLowerCase()]?.avg;
   return v > 0 ? v : null;
@@ -275,14 +275,14 @@ function wCropPlan() {
   const max = Math.max(...rows.map((r) => r.perDay || 0), 1e-9);
   return `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>#</th><th>Cultivo</th><th class="r" data-tip="Tiempo de crecimiento|Lo que tarda el cultivo en madurar, ya con tus boosts de velocidad|No depende de cuándo entres al juego" tabindex="0">Madura en</th>
     <th class="r" data-tip="Lo recoges cada|El crecimiento redondeado a tu próxima visita: si entras cada ${S.visitH} h, un cultivo que madura en 3 h lo recoges cada ${S.visitH} h|Es el que cuenta para el FLOWER/día" tabindex="0">Lo recoges cada${Legend("cycle")}</th>
-    <th class="r" data-tip="Por cosecha|Unidades medias que sacas de cada parcela con todos tus boosts de cantidad (NFTs, skills, zonas de efecto)|fuente: sfl.world" tabindex="0">Por cosecha</th>
+    <th class="r" data-tip="Por cosecha|Unidades medias que sacas de cada parcela con todos tus boosts de cantidad (NFTs, skills, zonas de efecto)|fórmulas del juego" tabindex="0">Por cosecha</th>
     <th class="r">Precio</th><th class="r" data-tip="FLOWER/día|Todas tus parcelas con este cultivo, cosechando al ritmo de «Lo recoges cada» y vendiendo a floor|" tabindex="0">FLOWER/día</th></tr></thead><tbody>
     ${rows.map((r, i) => `<tr data-open="collectibles-${G.itemIds[r.name]}"><td class="ic"><span class="rankno">${i + 1}</span></td>
       <td class="w"><div class="name">${Gi(r.name, 14, "carrot")}<span>${esc(r.name)}</span>${r.observed ? "" : `<span class="tag" title="Sin plantaciones actuales: se aplica tu boost medio">est.</span>`}</div></td>
       <td class="r dim">${dur(r.hours * 3600_000)}</td><td class="r ${r.cyc > r.hours * 1.05 ? "down" : ""}">${dur(r.cyc * 3600_000)}</td>
       <td class="r ${r.amt > 1 ? "up" : "dim"}">×${fmt(r.amt, 2)}</td><td class="r dim">${fmt(r.p)}</td><td class="r cellbar"><b>${r.perDay != null ? fmt(r.perDay, 2) : "—"}</b><i style="width:${(((r.perDay || 0) / max) * 70).toFixed(0)}%;left:auto;right:12px"></i></td></tr>`).join("")}
   </tbody></table></div>
-  <div class="mod-f"><span>Todas tus parcelas con ese cultivo · ${has("myBoosts") ? "cantidad por cosecha con tus boosts (sfl.world)" : "1 por parcela: sin datos de tus boosts de cantidad"} · vendiendo a floor</span><span>ciclo rojo = esperas a tu próxima visita</span></div>`;
+  <div class="mod-f"><span>Todas tus parcelas con ese cultivo · ${has("myBoosts") ? "cantidad por cosecha con tus boosts (fórmulas del juego)" : "1 por parcela: sin datos de tus boosts de cantidad"} · vendiendo a floor</span><span>ciclo rojo = esperas a tu próxima visita</span></div>`;
 }
 
 function wNodePlan() {
@@ -290,11 +290,11 @@ function wNodePlan() {
   const total = rows.reduce((s, r) => s + (r.perDay || 0), 0);
   setSub("st-nodes", `≈ ${fmt(total, 2)} FLOWER/día`);
   if (!rows.length) return Empty("tree", "Sin nodos", "");
-  return `<div class="tbl-wrap"><table class="tbl"><thead><tr><th></th><th>Recurso</th><th class="r">Nodos</th><th class="r" data-tip="Recarga → lo recoges cada|Primero lo que tarda el nodo en recargarse con tus boosts; en rojo, cada cuánto lo recoges de verdad si entras cada ${S.visitH} h|" tabindex="0">Recarga → lo recoges cada${Legend("cycle")}</th><th class="r" data-tip="Por golpe|Unidades medias por nodo con todos tus boosts de cantidad (NFTs, skills, zonas de efecto)|fuente: sfl.world" tabindex="0">Por golpe</th><th class="r">FLOWER/día</th></tr></thead><tbody>
+  return `<div class="tbl-wrap"><table class="tbl"><thead><tr><th></th><th>Recurso</th><th class="r">Nodos</th><th class="r" data-tip="Recarga → lo recoges cada|Primero lo que tarda el nodo en recargarse con tus boosts; en rojo, cada cuánto lo recoges de verdad si entras cada ${S.visitH} h|" tabindex="0">Recarga → lo recoges cada${Legend("cycle")}</th><th class="r" data-tip="Por golpe|Unidades medias por nodo con todos tus boosts de cantidad (NFTs, skills, zonas de efecto)|fórmulas del juego" tabindex="0">Por golpe</th><th class="r">FLOWER/día</th></tr></thead><tbody>
     ${rows.map((r) => `<tr data-open="collectibles-${G.itemIds[r.item]}"><td class="ic">${Gi(r.item, 16, CATS[r.cat].spr)}</td><td class="w">${esc(r.item)}</td>
       <td class="r">${r.n}</td><td class="r dim">${dur(r.hours * 3600_000)}${r.cyc > r.hours * 1.05 ? ` <span class="down">→ ${dur(r.cyc * 3600_000)}</span>` : ""}</td>
       <td class="r ${r.amt > 1 ? "up" : "dim"}">×${fmt(r.amt, 2)}</td><td class="r"><b>${r.perDay != null ? fmt(r.perDay, 2) : "—"}</b></td></tr>`).join("")}
-  </tbody></table></div><div class="mod-f"><span>${has("myBoosts") ? "Cantidad por golpe con tus boosts (sfl.world)" : "1 unidad por golpe: sin datos de tus boosts"} · con tu ritmo de visitas</span><span>total ${fmt(total, 2)} FLOWER/día</span></div>`;
+  </tbody></table></div><div class="mod-f"><span>${has("myBoosts") ? "Cantidad por golpe con tus boosts (fórmulas del juego)" : "1 unidad por golpe: sin datos de tus boosts"} · con tu ritmo de visitas</span><span>total ${fmt(total, 2)} FLOWER/día</span></div>`;
 }
 
 // Apartado "Tus boosts": qué tienes activo y qué usa la estrategia en sus cálculos
@@ -321,7 +321,7 @@ function wBoosts() {
         ${nodes.map(([n, r]) => { const why = n === "Árboles" ? br.treeBoosts : n === "Oil" ? br.oilBoosts : null; return `<dt>${n}</dt><dd${why?.length ? ` data-tip="${esc(`${n}|${why.join(" · ")}|calculado con las reglas del juego (no queda registrado en la granja)`)}"` : ""}>${pctTime(r)}</dd>`; }).join("")}
         ${ylds.map(([n, v]) => `<dt>${n} por golpe</dt><dd class="up">×${fmt(v.avg, 2)}</dd>`).join("")}
       </dl>
-      <p class="ctx">Velocidad medida en tus parcelas y nodos; cantidades de sfl.world. Los temporales no se suman a los cálculos de siempre: se avisan en el plan de acción mientras duran.</p></div>
+      <p class="ctx">Velocidad medida en tus parcelas y nodos; cantidades con las fórmulas del juego. Los temporales no se suman a los cálculos de siempre: se avisan en el plan de acción mientras duran.</p></div>
   </div>`;
 }
 

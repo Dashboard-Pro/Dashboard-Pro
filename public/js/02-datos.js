@@ -156,7 +156,9 @@ const LOADERS = {
   craftRecipes: () => load("craftRecipes", () => api("/api/ext/crafting").then((d) => d.groups || []), 86400_000),
   npcDeliveries: () => load("npcDeliveries", () => api("/api/ext/deliveries"), 86400_000),
   worldAuctions: () => load("worldAuctions", () => api("/api/ext/auctions").then((d) => d.list || []), 3 * 3600_000),
-  myBoosts: () => LOADERS.farm().then((f) => load("myBoosts", () => api(`/api/ext/boosts/${encodeURIComponent(f.nft_id ?? f.id)}`), 6 * 3600_000)),
+  // Cantidades por cosecha/golpe con tus boosts: calculadas aquí con las fórmulas del juego (28-cantidades.js) sobre la
+  // granja oficial; antes venían de sfl.world. Se recalculan con cada granja nueva.
+  myBoosts: () => LOADERS.farm().then((f) => load("myBoosts", async () => farmYields(f.farm), 30_000)),
   stats: () => load("stats", () => data("statsLeaderboard").then((r) => r.data), 3600_000),
   tickets: () => LOADERS.farm().then((f) => load("tickets", () => data("ticketLeaderboard", { farmId: f.id, limit: 100 }).then((r) => r.data), 600_000)),
   auctions: () => load("auctions", () => data("auctions").then((r) => r.data.auctions), 3600_000),

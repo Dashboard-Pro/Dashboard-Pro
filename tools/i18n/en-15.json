@@ -42,5 +42,10 @@
 "Qué avisar":"What to alert",
 "SFL Console: aviso de prueba":"SFL Console: test alert",
 "notificaciones de la app en este ordenador":"app notifications on this computer",
-"Salen como notificaciones de Windows mientras la app esté abierta (aunque esté minimizada); al pulsar una, se abre la granja en esa categoría. Con la app cerrada no avisa: para eso están los avisos a Discord.":"They show up as Windows notifications while the app is open (even minimised); clicking one opens the farm on that category. With the app closed there are no alerts: that's what the Discord alerts are for."
+"Salen como notificaciones de Windows mientras la app esté abierta (aunque esté minimizada); al pulsar una, se abre la granja en esa categoría. Con la app cerrada no avisa: para eso están los avisos a Discord.":"They show up as Windows notifications while the app is open (even minimised); clicking one opens the farm on that category. With the app closed there are no alerts: that's what the Discord alerts are for.",
+"Cantidad por golpe con tus boosts (fórmulas del juego)":"Amount per hit with your boosts (game formulas)",
+"Velocidad medida en tus parcelas y nodos; cantidades con las fórmulas del juego. Los temporales no se suman a los cálculos de siempre: se avisan en el plan de acción mientras duran.":"Speed measured on your plots and nodes; amounts with the game formulas. Temporary boosts aren't added to the usual calculations: they're flagged in the action plan while they last.",
+"cantidad por cosecha con tus boosts (fórmulas del juego)":"amount per harvest with your boosts (game formulas)",
+"fuente: fórmulas del juego + mercado":"source: game formulas + market",
+"fórmulas del juego":"game formulas"
 }

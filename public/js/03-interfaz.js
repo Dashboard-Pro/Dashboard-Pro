@@ -420,7 +420,7 @@ function renderViewBanner() {
 /* ════════════════════════════════════════════════════════════════════════
    8. Widgets compartidos
    ════════════════════════════════════════════════════════════════════════ */
-// Lo que vale lo que está listo: unidades medias con tus boosts (sfl.world) × floor de hoy. Solo lo que sale con precio
+// Lo que vale lo que está listo: unidades medias con tus boosts (fórmulas del juego) × floor de hoy. Solo lo que sale con precio
 // (cultivos, frutales, invernadero, nodos y comida); animales, compost, flores… se cuentan pero no se valoran.
 const READY_NODE = { trees: "Wood", stones: "Stone", iron: "Iron", gold: "Gold", crimstones: "Crimstone", sunstones: "Sunstone", oil: "Oil" };
 function timerValue(x) {
@@ -454,7 +454,7 @@ function wReadyNow() {
   setSub("ov-ready", `${f.timers.length} activos`);
   const val = readyValue(f.timers);
   return `<div class="fill"><div class="hero-ready"><div class="big ${total ? "green" : "parch"}">${total}</div>
-      <div class="lbl"><b>${total ? "para recoger ahora" : "todo está creciendo"}</b><span class="ctx">${hot.length} de ${Object.keys(per).length} categorías con algo listo</span>${val.total > 0 ? `<span class="ctx" data-tip="Lo que vale|Unidades medias con tus boosts × floor de hoy, de cultivos, frutales, invernadero, nodos y comida (sin comisión)|fuente: sfl.world + mercado" tabindex="0">≈ <b class="sun">${fmt(val.total, 2)} FLOWER</b> a precio de mercado</span>` : ""}</div></div>
+      <div class="lbl"><b>${total ? "para recoger ahora" : "todo está creciendo"}</b><span class="ctx">${hot.length} de ${Object.keys(per).length} categorías con algo listo</span>${val.total > 0 ? `<span class="ctx" data-tip="Lo que vale|Unidades medias con tus boosts × floor de hoy, de cultivos, frutales, invernadero, nodos y comida (sin comisión)|fuente: fórmulas del juego + mercado" tabindex="0">≈ <b class="sun">${fmt(val.total, 2)} FLOWER</b> a precio de mercado</span>` : ""}</div></div>
     ${hot.length ? `<div class="rchips">${hot.map(([k, v]) => `<button class="rchip" data-go="farm" data-filter="${k}" title="Ver ${CATS[k].label} en Granja">${sprite(CATS[k].spr, 14)}<b>${v.ready}</b>${CATS[k].label}${val.by[k] >= 0.005 ? `<small class="faint">≈${fmt(val.by[k], 2)}</small>` : ""}</button>`).join("")}</div>`
       : `<p class="ctx" style="margin:14px 0 0">Te avisamos cuando madure lo siguiente.</p>`}
     <div class="forecast push">${[[1, "1 h"], [3, "3 h"], [12, "12 h"]].map(([h, l]) => `<div><span class="eyebrow">en ${l}</span><b>+${within(h)}</b></div>`).join("")}</div></div>`;
