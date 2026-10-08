@@ -70,13 +70,13 @@ function wGameStats() {
       ${Kcell("VIP", fmt(d.vip, 0), `${pct(d.vip)} de las activas`, "sun")}
       ${st.active != null ? Kcell("Rachas de excavación", fmt(st.active, 0), `${fmt(st[7] || 0, 0)} de 7+ días · ${fmt(st[30] || 0, 0)} de 30+`) : ""}
     </div>
-    <div class="st-grid">
+    <div class="gst-grid">
       <div class="st-card"><div class="grp">Islas</div>${bar(Object.entries(d.islands || {}).sort((a, b) => b[1] - a[1]).map(([k, n]) => [`isla ${ISLE_ES_ALL[k] || k}`, n]))}</div>
       <div class="st-card"><div class="grp">Facciones</div>${bar(Object.entries(d.factions || {}).sort((a, b) => b[1] - a[1]).map(([k, n]) => [esc(FACTION_ES?.[k] || k), n]))}</div>
       ${Object.keys(d.ascension || {}).length ? `<div class="st-card"><div class="grp">Ascensiones</div>${bar(Object.entries(d.ascension).sort((a, b) => Number(a[0]) - Number(b[0])).map(([k, n]) => [`Ascensión ${k}`, n]))}</div>` : ""}
       ${st.active != null ? `<div class="st-card"><div class="grp">Rachas de excavación</div>${bar([["con racha", st.active], ["7+ días", st[7] || 0], ["14+ días", st[14] || 0], ["30+ días", st[30] || 0], ["60+ días", st[60] || 0], ["100+ días", st[100] || 0]])}</div>` : ""}
     </div>
-    <div class="st-grid">
+    <div class="gst-grid">
       ${listOf(mutants, "Mutantes del capítulo (los más raros primero)")}
       ${listOf(marvels, "Peces maravilla")}
       ${listOf(banners, "Banners")}

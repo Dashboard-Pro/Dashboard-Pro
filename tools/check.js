@@ -109,6 +109,17 @@ async function uiChecks() {
   }
   section("Scripts");
   ok(!dup.length, `sin nombres globales repetidos entre archivos${dup.length ? `: ${dup.join(", ")}` : ""}`);
+  // Lo mismo en el CSS: una clase con dos reglas que fijan su "display" (pasó con .st-grid: el stock del Resumen y las
+  // Estadísticas se pisaban y el stock salía en una sola columna)
+  const css = fs.readFileSync(path.join(root, "public/app.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/@media[^{]*\{((?:[^{}]*\{[^{}]*\})*)[^{}]*\}/g, ""); // las de @media ajustan, no chocan
+  const disp = {};
+  for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const sel = m[1].trim();
+    if (/^\.[\w-]+$/.test(sel) && /(^|;)\s*display\s*:/.test(m[2])) disp[sel] = (disp[sel] || 0) + 1;
+  }
+  const clash = Object.keys(disp).filter((k) => disp[k] > 1);
+  ok(!clash.length, `sin clases CSS definidas dos veces con su propio display${clash.length ? `: ${clash.join(", ")}` : ""}`);
 }
 
 // ── 1. Datos del juego ────────────────────────────────────────────────────────

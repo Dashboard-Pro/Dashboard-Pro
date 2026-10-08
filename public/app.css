@@ -1197,7 +1197,7 @@ button.xland:hover { border-color: var(--sun); }
 @media (max-width: 760px) { .xchips { display: none; } .xwrap { padding: 10px; } }
 
 /* ── Estadísticas del juego ── */
-.st-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0; border-bottom: 1px solid var(--line); }
+.gst-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0; border-bottom: 1px solid var(--line); }
 .st-card { border-right: 1px solid var(--line); min-width: 0; }
 .st-card .grp { border-top: 0; }
 .stat-bars { padding: 10px 16px; display: grid; gap: 8px; }
