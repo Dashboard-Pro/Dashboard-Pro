@@ -17,5 +17,18 @@
 "desactivado en el marketplace: no se puede comprar (los anuncios que quedan son antiguos), solo vender los tuyos a la tienda":"disabled on the marketplace: it can't be bought (the listings left are old), you can only sell yours to the shop",
 "en directo: cada {0} s":"live: every {0} s",
 "en directo: cada {0} s · comprobado a las {1}":"live: every {0} s · checked at {1}",
-"Mientras tengas esta página abierta, tu granja se pide cada pocos segundos: lo que caves en el juego sale aquí en cuanto el juego lo guarda":"While this page is open your farm is fetched every few seconds: what you dig in the game shows up here as soon as the game saves it"
+"Mientras tengas esta página abierta, tu granja se pide cada pocos segundos: lo que caves en el juego sale aquí en cuanto el juego lo guarda":"While this page is open your farm is fetched every few seconds: what you dig in the game shows up here as soon as the game saves it",
+"Comprobando la tarea programada…":"Checking the scheduled task…",
+"Creando la tarea programada…":"Creating the scheduled task…",
+"Quitando la tarea programada…":"Removing the scheduled task…",
+"Guardar con el dashboard cerrado solo está disponible en Windows por ahora.":"Saving with the dashboard closed is only available on Windows for now.",
+"Próxima":"Next",
+"Seguir guardando con el dashboard cerrado":"Keep saving with the dashboard closed",
+"Sustituye a la tarea del volcado nocturno que ya tienes.":"It replaces the nightly dump task you already have.",
+"Tarea quitada":"Task removed",
+"Listo: se guardará cada 3 horas aunque cierres el dashboard":"Done: it will save every 3 hours even with the dashboard closed",
+"Una tarea de Windows cada 3 horas, sin ventana: guarda tus operaciones del mercado (la API solo da las 50 últimas), la foto diaria de precios y procesa el volcado nocturno, aunque no abras el dashboard. Si está abierto no hace nada.{0} {1}":"A Windows task every 3 hours, with no window: it saves your market trades (the API only gives the last 50), the daily price snapshot and processes the nightly dump, even if you don't open the dashboard. If it's open it does nothing.{0} {1}",
+"Registro: {0}":"Log: {0}",
+"· código {0}":"· code {0}",
+"Última vez":"Last time"
 }

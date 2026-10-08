@@ -549,7 +549,30 @@ async function renderDumpSettings(st) {
     </dl>
     <p class="ctx">Descarga ~800 MB al día (el volcado de las granjas activas) del servidor de descargas de Sunflower Land, sin tu key, y guarda
       un resumen de ~100 KB en <code>data/dump/</code> que llega a tus otros ordenadores por GitHub. Actívalo solo en uno (el de casa).</p>
-    <div class="row"><button class="btn sm" data-dump="now" ${st.running ? "disabled" : ""}>Procesar ahora</button><a class="btn sm ghost" href="#community">Ver Comunidad</a></div>`;
+    <div class="row"><button class="btn sm" data-dump="now" ${st.running ? "disabled" : ""}>Procesar ahora</button><a class="btn sm ghost" href="#community">Ver Comunidad</a></div>
+    <div id="st-bg" style="margin-top:14px"></div>`;
+  renderBgTask();
+}
+// Pasada de fondo con el dashboard cerrado (tarea programada de Windows cada 3 h): tus operaciones, precios y volcado
+async function renderBgTask(st) {
+  const el = $("#st-bg");
+  if (!el) return;
+  if (!st) { el.innerHTML = `<p class="ctx">Comprobando la tarea programada…</p>`; try { st = await api("/api/background-task"); } catch { st = null; } }
+  if (!el.isConnected) return;
+  if (!st?.supported) { el.innerHTML = st ? `<p class="ctx">Guardar con el dashboard cerrado solo está disponible en Windows por ahora.</p>` : ""; return; }
+  const ok = st.result === 0 || st.result == null;
+  el.innerHTML = `<label class="toggle"><input type="checkbox" id="bgTaskToggle" ${st.installed ? "checked" : ""}/><i></i><span>Seguir guardando con el dashboard cerrado</span></label>
+    ${st.installed ? `<dl class="kv" style="margin-top:10px"><dt>Última vez</dt><dd class="${ok ? "" : "down"}">${st.lastRun ? `${ago(Date.parse(st.lastRun))}${ok ? "" : ` · código ${esc(String(st.result))}`}` : "aún no"}</dd>
+      <dt>Próxima</dt><dd>${st.next ? new Date(st.next).toLocaleString(LOCALE, { weekday: "short", hour: "2-digit", minute: "2-digit" }) : "—"}</dd></dl>` : ""}
+    <p class="ctx">Una tarea de Windows cada 3 horas, sin ventana: guarda tus operaciones del mercado (la API solo da las 50 últimas), la foto
+      diaria de precios y procesa el volcado nocturno, aunque no abras el dashboard. Si está abierto no hace nada.${st.legacy ? " Sustituye a la tarea del volcado nocturno que ya tienes." : ""}
+      ${st.installed && st.log ? `Registro: <code>${esc(st.log)}</code>` : ""}</p>`;
+}
+async function bgTaskAction(enabled) {
+  const el = $("#st-bg");
+  if (el) el.innerHTML = `<p class="ctx">${enabled ? "Creando" : "Quitando"} la tarea programada…</p>`;
+  try { renderBgTask(await jpost("/api/background-task", { enabled })); toast(enabled ? "Listo: se guardará cada 3 horas aunque cierres el dashboard" : "Tarea quitada", 4000); }
+  catch (e) { toast(e.message, 5000); renderBgTask(); }
 }
 
 function wCalendar() {

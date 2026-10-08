@@ -547,6 +547,20 @@ async function cloudChecks(localPost, localFarm) {
     }
     ok((await fetch(`http://127.0.0.1:${MOCK}/world/_leak`).then((r) => r.json())).leaked === false, "la API key nunca se envía a sfl.world ni al CDN del volcado");
 
+    section("Pasada de fondo (dashboard cerrado)");
+    {
+      const { spawnSync } = require("node:child_process");
+      const bgData = path.join(tmp, "bg-data");
+      const env = { ...process.env, SFL_API_KEY: "sfl.demo", SFL_FARM_ID: "29411", SFL_MIN_GAP_MS: "150", SFL_UPSTREAM: `http://127.0.0.1:${MOCK}/community`,
+        SFL_WORLD: `http://127.0.0.1:${MOCK}/world`, SFL_DUMP_CDN: `http://127.0.0.1:${MOCK}/cdn`, SFL_CONFIG: path.join(tmp, "bg-config.json"), SFL_DATA_DIR: bgData };
+      const run = (port) => spawnSync(process.execPath, [path.join(__dirname, "background-run.js")], { env: { ...env, PORT: String(port) }, encoding: "utf8", timeout: 60_000 });
+      const closed = run(4202);
+      ok(closed.status === 0 && fs.existsSync(path.join(bgData, "trades-121500.json")) && fs.readdirSync(bgData).some((f) => /^prices-\d{4}-\d{2}\.json$/.test(f)),
+        "con el dashboard cerrado guarda tus operaciones y la foto de precios y sale");
+      const open = run(PORT); // el puerto de la demo está ocupado = dashboard abierto
+      ok(open.status === 0 && /Nada que hacer/.test(open.stdout), "con el dashboard abierto no hace nada (ya lo hace él)");
+    }
+
     section("Sin sfl.world (datos oficiales y copia guardada)");
     {
       const dv = await fetch(`${base}/api/ext/deliveries`);

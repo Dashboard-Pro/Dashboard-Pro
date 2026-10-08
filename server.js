@@ -914,6 +914,18 @@ async function handleApi(req, res, url) {
     return send(res, 200, visibleCosts(all));
   }
 
+  // Tarea programada de Windows para la pasada de fondo (Ajustes → Datos de la comunidad)
+  if (!CLOUD && p === "/api/background-task") {
+    if (process.platform !== "win32") return send(res, 200, { supported: false });
+    if (req.method === "POST") {
+      let body;
+      try { body = await readBody(req); } catch { return send(res, 400, { error: "JSON inválido" }); }
+      const r = await runPowerShell(["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", path.join(ROOT, "tools", "install-background-task.ps1"), ...(body.enabled ? [] : ["-Quitar"])]);
+      if (r.code !== 0) return send(res, 500, { error: `No se pudo ${body.enabled ? "crear" : "quitar"} la tarea programada: ${r.err.trim().slice(0, 200)}` });
+    }
+    return send(res, 200, await backgroundTaskStatus());
+  }
+
   if (!CLOUD && p.startsWith("/api/dump")) {
     if (p === "/api/dump/summary") {
       const s = nightly.summary(url.searchParams.get("date"));
@@ -1251,8 +1263,43 @@ if (process.env.SFL_APP === "1" && !CLOUD) {
     }
   }, 30_000).unref();
 }
+// Pasada de fondo (SFL_BACKGROUND=1, la lanza la tarea programada con el dashboard cerrado): guarda tus operaciones
+// (la API solo da las 50 últimas) y la foto de precios del día, procesa el volcado si hay uno nuevo, sincroniza data/ y
+// sale. Con el dashboard abierto no hace nada: el puerto está ocupado y ese servidor ya lo hace él solo.
+const BACKGROUND = process.env.SFL_BACKGROUND === "1" && !CLOUD;
+async function backgroundPass() {
+  const t0 = Date.now();
+  try {
+    await backgroundArchive();
+    if (nightly && config.nightlyDump && config.apiKey) {
+      const s = await nightly.ingest();
+      if (s.lastError) console.log(`  Volcado: ${s.lastError.message}`);
+    }
+    if (cloudClient?.status().linked) await cloudClient.sync().catch(() => {});
+    if (gitSync && config.gitSync !== false && await gitSync.check().catch(() => false)) await gitSync.sync({ force: true }).catch(() => {});
+  } catch (e) { console.log(`  Pasada de fondo: ${e.message}`); }
+  console.log(`  Pasada de fondo hecha en ${Math.round((Date.now() - t0) / 1000)} s`);
+  process.exit(0);
+}
+// La tarea programada que lanza la pasada de fondo (solo Windows; tools/install-background-task.ps1)
+const BG_TASK = "SFL Dashboard - en segundo plano";
+function runPowerShell(args) {
+  return new Promise((resolve) => {
+    require("node:child_process").execFile("powershell.exe", args, { timeout: 60_000, windowsHide: true }, (e, out, err) =>
+      resolve({ code: e ? e.code ?? 1 : 0, out: String(out || ""), err: String(err || e?.message || "") }));
+  });
+}
+async function backgroundTaskStatus() {
+  const ps = `$t = Get-ScheduledTask -TaskName '${BG_TASK}' -ErrorAction SilentlyContinue; $o = Get-ScheduledTask -TaskName 'SFL Dashboard - volcado nocturno' -ErrorAction SilentlyContinue
+if ($t) { $i = $t | Get-ScheduledTaskInfo; $last = if ($i.LastRunTime -and $i.LastRunTime.Year -gt 2000) { $i.LastRunTime.ToUniversalTime().ToString('o') } else { $null }
+  @{ installed = $true; lastRun = $last; next = if ($i.NextRunTime) { $i.NextRunTime.ToUniversalTime().ToString('o') } else { $null }; result = $i.LastTaskResult } | ConvertTo-Json -Compress }
+else { @{ installed = $false; legacy = [bool]$o } | ConvertTo-Json -Compress }`;
+  const r = await runPowerShell(["-NoProfile", "-Command", ps]);
+  try { return { supported: true, log: path.join(process.env.LOCALAPPDATA || "", "sfl-dashboard-fondo.log"), ...JSON.parse(r.out.trim()) }; } catch { return { supported: true, installed: null, error: r.err.slice(0, 200) }; }
+}
 server.on("error", (e) => {
   if (e.code !== "EADDRINUSE" || CLOUD) throw e;
+  if (BACKGROUND) { console.log("  El dashboard está abierto: él ya guarda el historial. Nada que hacer."); process.exit(0); }
   // El puerto ya está ocupado: casi siempre es el dashboard abierto en otra ventana → solo abrimos la pestaña
   console.log(`\n  El puerto ${config.port} ya está en uso: seguramente el dashboard ya está abierto en otra ventana.`);
   console.log(`  Abriendo http://localhost:${config.port} … (si no carga, cierra el otro programa que use ese puerto)\n`);
@@ -1263,6 +1310,7 @@ server.on("error", (e) => {
 // Local: solo escucha en 127.0.0.1 (la key no queda expuesta a tu red). Nube: en todas las interfaces,
 // detrás del proxy HTTPS del alojamiento.
 server.listen(config.port, CLOUD ? process.env.HOST || "0.0.0.0" : "127.0.0.1", () => {
+  if (BACKGROUND) return backgroundPass(); // sin intervalos, sin ventana: hace lo suyo y sale
   console.log(`\n  🌻 SFL Dashboard${CLOUD ? " (nube)" : ""} → ${CLOUD ? CLOUD_URL : `http://localhost:${config.port}`}\n`);
   openBrowser(`http://localhost:${config.port}`);
   if (!config.apiKey) console.log(CLOUD ? "  (falta SFL_API_KEY del administrador)\n" : "  (sin API key: pégala en Ajustes dentro del dashboard)\n");

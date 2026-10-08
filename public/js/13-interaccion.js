@@ -192,6 +192,7 @@ document.addEventListener("change", async (e) => {
   }
   if (e.target.id === "gitSyncToggle") return gitSyncAction("toggle", e.target.checked);
   if (e.target.id === "dumpToggle") return dumpAction("toggle", e.target.checked);
+  if (e.target.id === "bgTaskToggle") return bgTaskAction(e.target.checked);
   if (e.target.dataset?.dccat) return discordAction("cats");
   if (e.target.id === "taxToggle") { S.p2pTax = e.target.checked; writeLS("tax", S.p2pTax); repaint("farm"); }
   if (e.target.id === "doneToggle") { S.showDone = e.target.checked; repaint("farm"); }
