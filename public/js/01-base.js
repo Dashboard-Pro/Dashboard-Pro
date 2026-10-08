@@ -228,8 +228,8 @@ function sprite(name, size = 16, pixel = false) {
 /* ════════════════════════════════════════════════════════════════════════
    3. Componentes reutilizables (devuelven HTML)
    ════════════════════════════════════════════════════════════════════════ */
-const Mod = ({ id, span = 12, title, icon, sub = "", act = "", flush = false, alt = false, foot = "" }) => `
-  <section class="mod s-${span}${alt ? " alt" : ""}">
+const Mod = ({ id, span = 12, title, icon, sub = "", act = "", flush = false, alt = false, foot = "", cls = "" }) => `
+  <section class="mod s-${span}${alt ? " alt" : ""}${cls ? ` ${cls}` : ""}">
     ${title ? `<header class="mod-h">${icon ? sprite(icon, 16) : ""}<h2>${title}</h2><span class="sub" id="${id}-sub">${sub}</span><div class="act">${act}</div></header>` : ""}
     <div class="mod-b${flush ? " flush" : ""}" id="${id}"></div>
     ${foot}

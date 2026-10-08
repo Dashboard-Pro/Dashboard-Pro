@@ -242,6 +242,13 @@ code { font-family: var(--mono); font-size: 0.92em; background: var(--panel-3); 
 .plate > .mod { background: var(--panel); min-width: 0; display: flex; flex-direction: column; }
 .plate > .mod.alt { background: var(--bg-2); }
 .s-2 { grid-column: span 2; } .s-3 { grid-column: span 3; } .s-4 { grid-column: span 4; } .s-5 { grid-column: span 5; }
+/* Módulo corto junto a uno muy largo (Simulador → Por categoría): su contenido acompaña al bajar en vez de quedarse
+   arriba de una caja vacía. Feeds largos (Discord) con su propio desplazamiento para no estirar a sus vecinos. */
+@media (min-width: 1081px) {
+  .mod.sticky-side > .mod-h { position: sticky; top: 0; z-index: 2; background: inherit; }
+  .mod.sticky-side > .mod-b { position: sticky; top: 45px; }
+}
+#ev-discord { max-height: min(78vh, 900px); overflow-y: auto; }
 .s-6 { grid-column: span 6; } .s-7 { grid-column: span 7; } .s-8 { grid-column: span 8; } .s-9 { grid-column: span 9; } .s-12 { grid-column: span 12; }
 
 .mod-h {
@@ -251,6 +258,9 @@ code { font-family: var(--mono); font-size: 0.92em; background: var(--panel-3); 
 .mod-h h2 { margin: 0; font: 600 14.5px var(--pixel); letter-spacing: 0.03em; color: var(--parch); white-space: nowrap; }
 .mod-h .sub { font: 11.5px var(--mono); color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .mod-h .act { margin-left: auto; display: flex; align-items: center; gap: 8px; flex: none; }
+/* Si los botones no caben junto al título, bajan a otra línea (pasaba en el Mapa de la isla) en vez de salirse */
+.mod-h { flex-wrap: wrap; row-gap: 8px; }
+.mod-h .act { flex: 0 1 auto; flex-wrap: wrap; justify-content: flex-end; min-width: 0; max-width: 100%; }
 .mod-b { padding: 14px 16px 16px; flex: 1; min-width: 0; }
 .mod-b.flush { padding: 0; }
 .mod-f { padding: 8px 16px; border-top: 1px solid var(--line); font: 11.5px var(--mono); color: var(--faint); display: flex; justify-content: space-between; gap: 10px; }

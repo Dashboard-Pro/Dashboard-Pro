@@ -395,7 +395,7 @@ PAGES.simulator = function simulator() {
     <div class="plate">${Mod({ id: "sm-k", span: 12, flush: true })}</div>
     <div class="plate">
       ${Mod({ id: "sm-list", span: 8, title: "Prueba boosts", icon: "bolt", flush: true, act: `<div class="seg">${SIM_KINDS.map(([k, l]) => `<button data-act="simkind:${k}" class="${S.simKind === k ? "on" : ""}">${l}</button>`).join("")}</div>` })}
-      ${Mod({ id: "sm-break", span: 4, title: "Por categoría", icon: "chest", flush: true })}
+      ${Mod({ id: "sm-break", span: 4, title: "Por categoría", icon: "chest", flush: true, cls: "sticky-side" })}
     </div>`;
   const deps = { deps: ["farm", "activity"], soft: ["myBoosts"] };
   mount("sm-k", { ...deps, render: wSimKpis, loading: "block" });

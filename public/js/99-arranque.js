@@ -15,7 +15,8 @@ $$("[data-sprite]").forEach((i) => (i.outerHTML = sprite(i.dataset.sprite, Numbe
   const asked = new URLSearchParams(location.search).get("farm");
   const view = () => {
     S.homeFarm = S.farmId;
-    if (/^\d{1,12}$/.test(asked || "") && asked !== String(S.homeFarm)) { S.viewing = asked; S.farmId = asked; }
+    // Las granjas nuevas tienen IDs de 16 cifras (antes se cortaba en 12 y no se abrían)
+    if (/^\d{1,20}$/.test(asked || "") && asked !== String(S.homeFarm)) { S.viewing = asked; S.farmId = asked; }
   };
   // Versión web (nube): la granja es la de tu cuenta o la que elijas ver; no hay key que configurar
   S.mode = st?.mode || "local";

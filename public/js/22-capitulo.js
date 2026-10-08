@@ -286,8 +286,8 @@ PAGES.chapter = function chapter() {
       ${Mod({ id: "ch-col", span: 4, title: "Colección del capítulo", icon: "gem" })}
     </div>
     <div class="plate">
-      ${Mod({ id: "ch-orders", span: 7, title: "Entregas de tickets", icon: "scroll", flush: true })}
-      ${Mod({ id: "ch-bounty", span: 5, title: "Bounties", icon: "coin", flush: true })}
+      ${Mod({ id: "ch-orders", span: 12, title: "Entregas de tickets", icon: "scroll", flush: true })}
+      ${Mod({ id: "ch-bounty", span: 12, title: "Bounties", icon: "coin", flush: true })}
     </div>
     <div class="plate">${Mod({ id: "ch-chores", span: 12, title: "Tareas semanales", icon: "check", flush: true })}</div>`;
   const o = { deps: ["farm"], soft: ["activity", "tickets"] };

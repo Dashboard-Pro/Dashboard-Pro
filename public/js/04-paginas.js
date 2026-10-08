@@ -129,7 +129,9 @@ const PAGES = {
         ${Mod({ id: "sk-trees", span: 8, title: "Árboles", icon: "bolt", flush: true })}
         ${Mod({ id: "sk-powers", span: 4, title: "Poderes", icon: "bolt", flush: true })}
       </div>
-      <div class="plate">${Mod({ id: "sk-ranks", span: 8, title: "Subir de rango", icon: "bolt", flush: true })}${Mod({ id: "sk-shards", span: 4, title: "Shards y reinicio", icon: "gem" })}</div>
+      <!-- Shards (resumen corto) arriba y las tarjetas de rango a todo el ancho: lado a lado, el corto quedaba estirado y vacío -->
+      <div class="plate">${Mod({ id: "sk-shards", span: 12, title: "Shards y reinicio", icon: "gem" })}</div>
+      <div class="plate">${Mod({ id: "sk-ranks", span: 12, title: "Subir de rango", icon: "bolt", flush: true })}</div>
       <div class="plate">
         <section class="mod s-12">
           <header class="mod-h">${sprite("sun", 16)}<h2 id="sk-tree-title">Árbol</h2><span class="sub" id="sk-tree-sub"></span></header>
@@ -241,7 +243,7 @@ const PAGES = {
       </div>
       <div class="plate">
         ${Mod({ id: "fc-petreq", span: 7, title: "Comida para la mascota", icon: "cook", flush: true })}
-        ${Mod({ id: "fc-hist", span: 5, title: "Tus semanas", icon: "calendar", flush: true })}
+        ${Mod({ id: "fc-hist", span: 5, title: "Tus semanas", icon: "calendar", flush: true, cls: "sticky-side" })}
       </div>
       <div class="plate">${Mod({ id: "fc-shop", span: 12, title: "Tienda de Eldric", icon: "chest", flush: true,
         act: `<div class="seg">${FC_SHOP_TYPES.map(([v, l]) => `<button data-act="fcshop:${v}" class="${S.fcShop === v ? "on" : ""}">${l}</button>`).join("")}</div>` })}</div>`;
@@ -279,7 +281,7 @@ const PAGES = {
       </div>
       <div class="plate">
         ${Mod({ id: "cm-supply", span: 8, title: "Suministro real", icon: "chest", flush: true, act: Seg(SUPPLY_VIEWS, S.supplyView, "supply") })}
-        ${Mod({ id: "cm-world", span: 4, title: "Islas y facciones", icon: "globe" })}
+        ${Mod({ id: "cm-world", span: 4, title: "Islas y facciones", icon: "globe", cls: "sticky-side" })}
       </div>`;
     mount("cm-k", { deps: ["dump"], soft: ["farm"], render: wDumpKpis, loading: "block" });
     mount("cm-me", { deps: ["dump"], render: wDumpMe, loading: "rows" });

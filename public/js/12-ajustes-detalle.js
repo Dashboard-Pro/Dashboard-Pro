@@ -358,7 +358,7 @@ function renderSearch() {
   searchList = [
     ...players.map((pl) => ({ player: pl })),
     ...[...starts, ...contains].slice(0, 8),
-    ...(/^\d{1,12}$/.test(raw) ? [{ farm: raw }] : []),
+    ...(/^\d{1,20}$/.test(raw) ? [{ farm: raw }] : []),
     ...(q.length >= 3 && !exact && /^[^/\\?#%]{1,40}$/.test(raw) ? [{ find: raw }] : []),
   ];
   searchSel = Math.min(searchSel, Math.max(0, searchList.length - 1));

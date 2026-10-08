@@ -118,6 +118,10 @@ async function uiChecks() {
     const sel = m[1].trim();
     if (/^\.[\w-]+$/.test(sel) && /(^|;)\s*display\s*:/.test(m[2])) disp[sel] = (disp[sel] || 0) + 1;
   }
+  // ?farm=ID y el buscador aceptan los IDs largos de las granjas nuevas (16 cifras; antes se cortaba en 12)
+  const longId = "2965405693782714";
+  const idRes = ["99-arranque.js", "12-ajustes-detalle.js"].flatMap((f) => [...fs.readFileSync(path.join(root, "public/js", f), "utf8").matchAll(/\/\^\\d\{1,(\d+)\}\$\//g)].map((m) => Number(m[1])));
+  ok(idRes.length >= 2 && idRes.every((n) => n >= longId.length), "ver granja: IDs de 16 cifras admitidos");
   const clash = Object.keys(disp).filter((k) => disp[k] > 1);
   ok(!clash.length, `sin clases CSS definidas dos veces con su propio display${clash.length ? `: ${clash.join(", ")}` : ""}`);
 }
