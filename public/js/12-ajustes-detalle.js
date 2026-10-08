@@ -405,7 +405,7 @@ function primeNotified(timers) {
   const t = now();
   S.notified = new Set(timers.filter((x) => x.ready - notifyLead() <= t).map(timerKey));
 }
-ACTIONS.notifyearly = (v) => { S.notifyEarly = Number(v) || 0; writeLS("notifyEarly", S.notifyEarly); if (has("farm")) primeNotified(store.farm.data.timers); rerun(); toast(S.notifyEarly ? `Te avisaremos ${S.notifyEarly} min antes` : "Te avisaremos al momento"); };
+ACTIONS.notifyearly = (v) => { S.notifyEarly = Number(v) || 0; writeLS("notifyEarly", S.notifyEarly); if (has("farm")) primeNotified(store.farm.data.timers); rerun(); renderDesktopNotify(); toast(S.notifyEarly ? `Te avisaremos ${S.notifyEarly} min antes` : "Te avisaremos al momento"); };
 function checkNotifications() {
   if (!has("farm") || S.viewing) return;
   const t = now();
@@ -422,10 +422,15 @@ function checkNotifications() {
   }
   if (!S.notify || !("Notification" in window) || Notification.permission !== "granted") return;
   for (const [k, list] of Object.entries(byCat)) {
+    if (!notifyCatOn(k)) continue; // categorías elegidas en Ajustes → Avisos en Windows
     const body = groupTimers(list).map((g) => `${g.name}${g.count > 1 ? " ×" + g.count : ""}`).join(", ");
     const soon = list.filter((x) => x.ready > t);
     const title = soon.length ? `${CATS[k].label}: listo en ${dur(Math.max(...soon.map((x) => x.ready)) - t)}` : `${CATS[k].label}: listo para recoger`;
-    try { new Notification(title, { body, tag: `sfl-${k}` }); } catch { /* ignorar */ }
+    // Con el icono de la app y, al pulsarla, la app al frente con la granja filtrada por esa categoría
+    try {
+      const n = new Notification(title, { body, tag: `sfl-${k}`, icon: "icon-192.png" });
+      n.onclick = () => { window.focus(); n.close(); go("farm", { filter: k }); };
+    } catch { /* ignorar */ }
   }
 }
 

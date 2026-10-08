@@ -486,6 +486,30 @@ function renderDesignSettings() {
     <p style="margin-top:10px"><button type="button" class="btn ghost sm" data-act="tour:start">Ver la guía del dashboard otra vez</button></p>`;
 }
 
+// Avisos en Windows: notificaciones del sistema (en la app, con su icono). Mismas categorías que Discord, elegidas aparte.
+S.notifyCats = readLS("notifyCats", null); // null = todas
+const notifyCatOn = (k) => !S.notifyCats || S.notifyCats.includes(k);
+const NOTIFY_CATS = () => Object.entries(CATS).filter(([k]) => !["daily", "lava"].includes(k));
+function renderDesktopNotify() {
+  const el = $("#st-desknotify");
+  if (!el) return;
+  if (!("Notification" in window)) { el.innerHTML = `<p class="ctx">Este navegador no permite notificaciones.</p>`; return; }
+  const perm = Notification.permission;
+  el.innerHTML = `<label class="toggle"><input type="checkbox" id="notifyToggle" ${S.notify && perm === "granted" ? "checked" : ""}/><i></i><span>Avisarme en Windows cuando algo esté listo</span></label>
+    ${perm === "denied" ? `<p class="ctx down">Las notificaciones están bloqueadas para el dashboard: actívalas en el candado de la barra de direcciones (o en Configuración de Windows → Notificaciones → Chrome/Edge).</p>` : ""}
+    <h4 class="acc-h">Qué avisar</h4>
+    <div class="dc-cats">${NOTIFY_CATS().map(([k, c]) => `<label class="chk-l"><input type="checkbox" data-ntcat="${k}" ${notifyCatOn(k) ? "checked" : ""}/> ${sprite(c.spr, 14)} ${esc(c.label)}</label>`).join("")}</div>
+    <div class="row" style="margin-top:8px"><span class="ctx" style="margin-right:6px">Antelación</span>${SegAct([[0, "al momento"], [5, "5 min antes"], [15, "15 min"], [30, "30 min"]], S.notifyEarly, "notifyearly")}
+      <button class="btn sm ghost" data-act="notifytest:1" ${S.notify && perm === "granted" ? "" : "disabled"}>Probar aviso</button></div>
+    <p class="ctx">Salen como notificaciones de Windows mientras la app esté abierta (aunque esté minimizada); al pulsar una, se abre la granja
+      en esa categoría. Con la app cerrada no avisa: para eso están los avisos a Discord.</p>`;
+}
+ACTIONS.notifytest = () => {
+  if (Notification.permission !== "granted") return toast("Activa primero los avisos");
+  const n = new Notification("SFL Console: aviso de prueba", { body: "Así te avisaremos cuando algo esté listo para recoger.", icon: "icon-192.png", tag: "sfl-test" });
+  n.onclick = () => { window.focus(); n.close(); };
+};
+
 // Avisos a Discord: pegas el webhook de tu canal (Editar canal → Integraciones → Webhooks) y eliges qué avisar
 async function renderDiscordSettings() {
   const el = $("#st-discord");

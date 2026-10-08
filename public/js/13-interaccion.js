@@ -176,6 +176,12 @@ document.addEventListener("change", async (e) => {
     S.notify = e.target.checked;
     writeLS("notify", S.notify);
     toast(S.notify ? "Te avisaremos cuando algo esté listo" : "Avisos desactivados");
+    renderDesktopNotify();
+  }
+  if (e.target.dataset?.ntcat) {
+    const on = $("[data-ntcat]").filter((i) => i.checked).map((i) => i.dataset.ntcat);
+    S.notifyCats = on.length === NOTIFY_CATS().length ? null : on;
+    writeLS("notifyCats", S.notifyCats);
   }
   if (e.target.classList?.contains("cost-in")) {
     const key = e.target.dataset.cost;

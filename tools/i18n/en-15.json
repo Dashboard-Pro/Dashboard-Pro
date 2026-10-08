@@ -30,5 +30,17 @@
 "Una tarea de Windows cada 3 horas, sin ventana: guarda tus operaciones del mercado (la API solo da las 50 últimas), la foto diaria de precios y procesa el volcado nocturno, aunque no abras el dashboard. Si está abierto no hace nada.{0} {1}":"A Windows task every 3 hours, with no window: it saves your market trades (the API only gives the last 50), the daily price snapshot and processes the nightly dump, even if you don't open the dashboard. If it's open it does nothing.{0} {1}",
 "Registro: {0}":"Log: {0}",
 "· código {0}":"· code {0}",
-"Última vez":"Last time"
+"Última vez":"Last time",
+"Activa primero los avisos":"Turn on the alerts first",
+"Antelación":"Lead time",
+"Así te avisaremos cuando algo esté listo para recoger.":"This is how we'll let you know when something is ready to collect.",
+"Avisarme en Windows cuando algo esté listo":"Alert me in Windows when something is ready",
+"Avisos en Windows":"Windows alerts",
+"Este navegador no permite notificaciones.":"This browser doesn't allow notifications.",
+"Las notificaciones están bloqueadas para el dashboard: actívalas en el candado de la barra de direcciones (o en Configuración de Windows → Notificaciones → Chrome/Edge).":"Notifications are blocked for the dashboard: allow them from the padlock in the address bar (or in Windows Settings → Notifications → Chrome/Edge).",
+"Probar aviso":"Test alert",
+"Qué avisar":"What to alert",
+"SFL Console: aviso de prueba":"SFL Console: test alert",
+"notificaciones de la app en este ordenador":"app notifications on this computer",
+"Salen como notificaciones de Windows mientras la app esté abierta (aunque esté minimizada); al pulsar una, se abre la granja en esa categoría. Con la app cerrada no avisa: para eso están los avisos a Discord.":"They show up as Windows notifications while the app is open (even minimised); clicking one opens the farm on that category. With the app closed there are no alerts: that's what the Discord alerts are for."
 }

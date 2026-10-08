@@ -349,14 +349,18 @@ const PAGES = {
         <section class="mod s-6"><header class="mod-h">${sprite("bell", 16)}<h2>Avisos a Discord</h2><span class="sub">al móvil, estés donde estés</span></header><div class="mod-b" id="st-discord"></div></section>
       </div>
       <div class="plate">
+        <section class="mod s-6"><header class="mod-h">${sprite("bell", 16)}<h2>Avisos en Windows</h2><span class="sub">notificaciones de la app en este ordenador</span></header><div class="mod-b" id="st-desknotify"></div></section>
         <section class="mod s-6"><header class="mod-h">${sprite("star", 16)}<h2>Apariencia</h2><span class="sub">diseño del dashboard</span></header><div class="mod-b" id="st-design"></div></section>
-        <section class="mod s-6"><header class="mod-h">${sprite("bolt", 16)}<h2>Actualizaciones</h2><span class="sub">versión del dashboard</span></header><div class="mod-b" id="st-update"></div></section>
+      </div>
+      <div class="plate">
+        <section class="mod s-12"><header class="mod-h">${sprite("bolt", 16)}<h2>Actualizaciones</h2><span class="sub">versión del dashboard</span></header><div class="mod-b" id="st-update"></div></section>
       </div>`;
     mount("st-proxy", { deps: ["status"], render: wProxy, loading: "rows" });
     renderLocalCloud();
     renderGitSync();
     renderDumpSettings();
     renderDiscordSettings();
+    renderDesktopNotify();
     renderDesignSettings();
     renderUpdateSettings();
   },
