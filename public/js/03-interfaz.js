@@ -136,7 +136,7 @@ function holdings() {
   const farm = store.farm.data.farm;
   const items = store.activity.data.items;
   const prev = has("activityPrev") ? store.activityPrev.data.items : {};
-  const rows = [];
+  const rows = [], unpriced = []; // unpriced: tiene mercado pero ni listados ni ventas → no suma (y se dice)
   // Tu propio listado no es precio de mercado: si todos los listados del item son tuyos, su "floor"
   // es lo que tú pides, y se ignora (se usa la última venta o, en pets/buds, la estimación)
   const mine = myListings();
@@ -154,7 +154,7 @@ function holdings() {
     }
     if (!it) return;
     const price = marketFloor(it, name) ?? it.latestSale;
-    if (!price) return;
+    if (!price) { unpriced.push({ name, qty, key }); return; }
     const pp = prev[key]?.floor ?? prev[key]?.latestSale;
     rows.push({ name, qty, price, value: qty * price, prevValue: pp ? qty * pp : null, key, bestOffer: it.bestOffer, liquid: it.bestOffer ? qty * it.bestOffer : 0 });
   };
@@ -184,7 +184,7 @@ function holdings() {
     const ref = u.col === "pets" && own == null ? petTypeRef(items, u.id, u.xp != null ? petLevel(u.xp).lvl : null) : null;
     const byType = ref?.typeFloor != null;
     const price = own ?? (byType ? ref.typeFloor : colFloor(items, u.col));
-    if (!price) continue;
+    if (!price) { unpriced.push({ name: itemName(key), qty: 1, key }); continue; }
     const pp = own != null ? prev[key]?.floor ?? prev[key]?.latestSale : byType ? petTypeRef(prev, u.id)?.typeFloor : colFloor(prev, u.col);
     rows.push({ name: itemName(key), qty: 1, price, value: price, prevValue: pp ?? null, key, bestOffer: it?.bestOffer, liquid: it?.bestOffer || 0,
       estimate: own == null ? (byType ? "type" : "col") : null, petRef: ref, traits: u.traits });
@@ -193,7 +193,15 @@ function holdings() {
   const total = rows.reduce((s, r) => s + r.value, 0);
   const withPrev = rows.filter((r) => r.prevValue != null);
   const prevTotal = withPrev.length ? withPrev.reduce((s, r) => s + r.prevValue, 0) + rows.filter((r) => r.prevValue == null).reduce((s, r) => s + r.value, 0) : null;
-  return { rows, total, prevTotal, liquid: rows.reduce((s, r) => s + r.liquid, 0), usd: total * (store.activity.data.flowerPrice || 0) };
+  return { rows, total, prevTotal, liquid: rows.reduce((s, r) => s + r.liquid, 0), usd: total * (store.activity.data.flowerPrice || 0), unpriced };
+}
+// "Sin precio" no es "vale 0": lo que tiene mercado pero ni un listado ni una venta no suma al total, y se dice cuánto es
+// y qué (tooltip). `only` filtra (p. ej. solo NFTs). Vacío si no hay nada.
+function unpricedNote(h, only = () => true, lead = " · ") {
+  const list = (h?.unpriced || []).filter(only);
+  if (!list.length) return "";
+  const names = list.slice(0, 12).map((u) => `${u.name}${u.qty > 1 ? ` ×${compact(u.qty)}` : ""}`).join(", ") + (list.length > 12 ? ` y ${list.length - 12} más` : "");
+  return `${lead}<span class="faint" data-tip="${esc(`Sin precio de mercado|${names}: tienen mercado pero ahora mismo nadie los vende ni hay ventas registradas, así que no se sabe cuánto valen. No suman al total (no es que valgan 0).|se valorarán solos en cuanto haya un listado o una venta`)}">${list.length} sin precio (${list.length === 1 ? "no suma" : "no suman"})</span>`;
 }
 
 // Coins por FLOWER comprando en el mercado y vendiendo en la tienda del juego (G.sellPrices), de mejor a peor
@@ -517,7 +525,7 @@ function wNextUp() {
 const STACK_COLORS = ["#f5c542", "#86e05c", "#6cb4ee", "#f0a24a", "#b596f0", "#f08bd0"];
 function wWealth() {
   const h = holdings();
-  if (!h.rows.length) return Empty("coin", "Sin items con mercado", "Nada de tu inventario tiene precio en el marketplace.");
+  if (!h.rows.length) return Empty("coin", "Sin items con mercado", `Nada de tu inventario tiene precio en el marketplace.${h.unpriced.length ? ` ${h.unpriced.length} tienen mercado pero sin listados ni ventas: no se sabe cuánto valen.` : ""}`);
   const farm = store.farm.data.farm;
   const bal = toNum(farm.balance);
   const fp = store.activity.data.flowerPrice || 0;
@@ -529,7 +537,7 @@ function wWealth() {
   recordWealth(h, bal);
   const gems = toNum(farm.inventory?.Gem), fpg = flowerPerGem();
   return `<div class="wealth"><div class="big sun">${fmt(h.total + bal, 0)}</div>
-      <div class="ctx" style="margin-top:6px">FLOWER · inventario <b>${fmt(h.total, 0)}</b> + saldo <b>${fmt(bal, 1)}</b>${delta != null ? ` · <span class="${Math.abs(delta) < 0.05 ? "faint" : delta > 0 ? "up" : "down"}">${pct(delta)}</span> vs floor de ayer${Legend("delta")}` : ""}</div></div>
+      <div class="ctx" style="margin-top:6px">FLOWER · inventario <b>${fmt(h.total, 0)}</b> + saldo <b>${fmt(bal, 1)}</b>${unpricedNote(h)}${delta != null ? ` · <span class="${Math.abs(delta) < 0.05 ? "faint" : delta > 0 ? "up" : "down"}">${pct(delta)}</span> vs floor de ayer${Legend("delta")}` : ""}</div></div>
     <div class="stackbar">${parts.map((p) => `<i style="flex:${p.value};background:${p.color}" data-tip="${esc(`${p.name}|${fmt(p.value, 1)} FLOWER|${fmt((p.value / h.total) * 100, 1)}% del inventario`)}"></i>`).join("")}</div>
     <div class="legend">${parts.map((p) => `<div><i style="background:${p.color}"></i><span>${esc(p.name)}</span><span class="n">${fmt((p.value / h.total) * 100, 0)}%</span></div>`).join("")}</div>
     <div class="ctx" style="margin-top:12px">Liquidez inmediata (vendiendo a la mejor oferta): <b>${fmt(h.liquid, 0)}</b> FLOWER</div>

@@ -36,7 +36,7 @@ function farm() {
     balance: "1234.56",
     island: { type: "volcano" },
     vip: { expiresAt: t0 + 19 * 24 * H },
-    inventory: { Gem: "420", Wood: "5320", Stone: "1210", Iron: "388", Gold: "96", Kale: "4100", Radish: "2210", Wheat: "8700", Egg: "900", "Crimstone": "12", "Ascension Shard": "6" },
+    inventory: { Gem: "420", Wood: "5320", Stone: "1210", Iron: "388", Gold: "96", Kale: "4100", Radish: "2210", Wheat: "8700", Egg: "900", "Crimstone": "12", "Ascension Shard": "6", Gnome: "1" },
     wardrobe: { "Red Farmer Shirt": 1 },
     socialFarming: { villageProjects: { "Big Orange": { cheers: 25 }, "Woodcutter's Monument": { cheers: 420 } } },
     crops, trees, stones, iron, gold,
@@ -173,6 +173,8 @@ function activity(prev) {
   items[`wearables-${G.wearableIds["Red Farmer Shirt"]}`] = { volume: 300, trades: 12, quantity: 12, latestSale: 3.5, floor: 3.2, listingCount: 4, offerCount: 1, bestOffer: 2.9 };
   items["pets-2513"] = { volume: 0, trades: 0, quantity: 0, floor: 45, listingCount: 2, offerCount: 0 };
   items["pets-1"] = { volume: 0, trades: 0, quantity: 0, floor: 900, listingCount: 1, offerCount: 0 }; // Griffin
+  // Gnome: tiene mercado pero ni listados ni ventas → "sin precio" (no suma, y se dice), nunca "vale 0"
+  if (G.itemIds.Gnome != null) items[`collectibles-${G.itemIds.Gnome}`] = { volume: 0, trades: 0, quantity: 0, listingCount: 0, offerCount: 0 };
   // Anuncio "trampa": floor absurdo en un item que se vendió a 220 (no debe valer como precio)
   // Tres Dragon vendidos: uno a 1 FLOWER (traspaso entre cuentas), que no debe contar en el valor del grupo
   { const P = G.petNfts, dragons = Object.keys(P?.ids || {}).filter((id) => P.types[P.ids[id][0]] === "Dragon" && id !== "2513" && id !== "1").slice(0, 3);

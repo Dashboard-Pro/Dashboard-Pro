@@ -252,7 +252,7 @@ function wNftTable() {
   const inCol = (r) => S.nftCol === "all" || (S.nftCol === "unique" ? UNIQUE_COLS.has(colOf(r.key)) : S.nftCol === "boost" ? Boolean(r.boost) : colOf(r.key) === S.nftCol);
   let rows = m.rows.filter((r) => inCol(r) && (!q || r.name.toLowerCase().includes(q) || traitsText(r.traits).toLowerCase().includes(q)));
   rows = sortRows(rows, S.nftSort);
-  setSub("nf-table", `${rows.length} de ${m.rows.length} · ${m.withCost.length} con precio de compra`);
+  setSub("nf-table", `${rows.length} de ${m.rows.length} · ${m.withCost.length} con precio de compra${unpricedNote(holdings(), (u) => isNft(u.key, u.name))}`);
   if (!m.rows.length) return Empty("trophy", "Sin NFTs con mercado", "No tienes coleccionables ni wearables que se vendan en el marketplace.");
   if (!rows.length) return Empty("trophy", "Sin resultados", "Ningún NFT coincide con el filtro.");
   const th = `<tr>${NFT_COLS.map((c) => `<th ${c.sort === false ? "" : `data-nsort="${c.key}"`} class="${c.align ?? "r"}${S.nftSort.key === c.key ? ` sorted${S.nftSort.dir > 0 ? " asc" : ""}` : ""}">${c.label}${c.legend ? Legend(c.legend) : ""}</th>`).join("")}</tr>`;

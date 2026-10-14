@@ -96,6 +96,8 @@ async function uiChecks() {
     // Pet NFT valorado por su boost (el Dragon de la demo): si no se ajusta por nivel, la tabla lo dice y explica por qué
     const d = (await dumpDom(browser, `${base}/?lang=es#nfts`, path.join(tmp, "ui-petlevel"))).replace(/&quot;/g, "\"");
     ok(/>ventas Dragon[^<]*<\/span> <span class="tag" data-tip="Sin ajuste por nivel\|[^"]*hacen falta 3[^"]*">sin nivel \d\/3</.test(d), "un pet valorado sin ajuste por nivel lo dice en la tabla (y por qué)");
+    // El Gnome de la demo tiene mercado pero ni listados ni ventas: "sin precio (no suma)", nunca valorado a 0 sin decirlo
+    ok(/data-tip="Sin precio de mercado\|Gnome:[^"]*">1 sin precio \(no suma\)</.test(d), "lo que no tiene precio se dice (no cuenta como 0 en silencio)");
   }
   // En el móvil: nada más ancho que la pantalla ni que se salga de su módulo
   for (let i = 0; i < pages.length; i += 4) {

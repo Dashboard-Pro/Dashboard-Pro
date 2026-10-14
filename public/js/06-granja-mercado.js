@@ -257,7 +257,7 @@ function wMarketTable() {
     rows = sortRows(rows, sort);
     const withCost = rows.filter((r) => r.pl != null);
     const plTotal = withCost.reduce((s, r) => s + r.pl, 0);
-    setSub("mk-table", `${rows.length} items · ${fmt(h.total, 0)} FLOWER a floor${withCost.length ? ` · <span class="${plTotal >= 0 ? "up" : "down"}">${plTotal >= 0 ? "+" : ""}${fmt(plTotal, Math.abs(plTotal) < 1 ? 3 : 1)}</span> FLOWER si vendes lo que tiene coste (${withCost.length})` : ""}`);
+    setSub("mk-table", `${rows.length} items · ${fmt(h.total, 0)} FLOWER a floor${unpricedNote(h)}${withCost.length ? ` · <span class="${plTotal >= 0 ? "up" : "down"}">${plTotal >= 0 ? "+" : ""}${fmt(plTotal, Math.abs(plTotal) < 1 ? 3 : 1)}</span> FLOWER si vendes lo que tiene coste (${withCost.length})` : ""}`);
     if (!rows.length) return Empty("coin", "Sin resultados", "Ningún item de tu inventario coincide con el filtro.");
     return `<div class="tbl-wrap"><table class="tbl"><thead>${thSort(MINE_COLS, sort)}</thead><tbody>${rows.map((r) => `
       <tr data-open="${r.key}"><td class="ic">${Star(r.key)}</td><td class="w"><div class="name">${Gi(r.key, 12, colIcon(r.key))}<span>${esc(r.name)}</span></div></td>

@@ -145,7 +145,7 @@ function wPending() {
     ${n ? `<h4 class="acc-h">Meta: expansión ${n.n}</h4>
       ${n.rows.filter((r) => r.need).map((r) => `<div class="bst-row"><span class="nm">${Gi(r.name, 14)} ${esc(r.name)} <span class="faint">${compact(Math.min(r.have, r.need))} / ${compact(r.need)}</span></span><span class="${r.miss ? "down" : "up"}">${r.miss ? `faltan ${compact(r.miss)}` : "✓"}</span></div>`).join("")}
       <p class="ctx">${n.coinsMiss ? `Faltan ${compact(n.coinsMiss)} coins · ` : ""}<a href="#strategy" data-go="strategy">plan completo en Estrategia → Expansión</a></p>` : ""}
-    ${h ? `<h4 class="acc-h">Valor de tu granja: ${fmt(h.total + flw + coinsF, 0)} FLOWER</h4>
+    ${h ? `<h4 class="acc-h">Valor de tu granja: ${fmt(h.total + flw + coinsF, 0)} FLOWER${unpricedNote(h)}</h4>
       <div class="fc-grid">${[["Recursos", resVal], ["NFTs", nftVal], ["FLOWER", flw], ["Monedas", coinsF]].map(([k, v]) => `<div><span class="eyebrow">${k}</span><b>${fmt(v, v < 10 ? 2 : 0)}</b></div>`).join("")}</div>` : ""}`;
 }
 function wMinigames() {

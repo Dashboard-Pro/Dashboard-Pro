@@ -40,5 +40,13 @@
 "ventas = última venta de cada pet del informe":"sales = each pet's last sale in the report",
 "ventas {0}":"sales {0}",
 "ventas mismo boost":"sales same boost",
-"floor mismo boost":"floor same boost"
+"floor mismo boost":"floor same boost",
+"Sin precio de mercado":"No market price",
+"se valorarán solos en cuanto haya un listado o una venta":"they'll be valued automatically as soon as there's a listing or a sale",
+"{0} sin precio ({1})":"{0} unpriced ({1})",
+"no suma":"not counted",
+"no suman":"not counted",
+"{0} tienen mercado pero sin listados ni ventas: no se sabe cuánto valen.":"{0} have a market but no listings or sales: their value is unknown.",
+"{0}: tienen mercado pero ahora mismo nadie los vende ni hay ventas registradas, así que no se sabe cuánto valen. No suman al total (no es que valgan 0).":"{0}: they have a market but right now nobody is selling them and there are no recorded sales, so their value is unknown. They're not added to the total (that doesn't mean they're worth 0).",
+"y {0} más":"and {0} more"
 }
