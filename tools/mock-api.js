@@ -354,6 +354,8 @@ http.createServer((req, res) => {
   }
   // Granja que nunca contesta (test del tope de tiempo: la cola no debe quedarse parada)
   if (url.pathname === "/community/farms/88888") return;
+  // Granja que siempre falla con 503 (test de la cola: un reintento en espera no debe frenar lo que llega después)
+  if (url.pathname === "/community/farms/66666") { res.writeHead(503); return res.end(""); }
   if (url.pathname === "/hook/log") { res.writeHead(200, { "content-type": "application/json" }); return res.end(JSON.stringify(hookLog)); }
   if (url.pathname.startsWith("/cdn/")) {
     if (req.headers["x-api-key"]) worldLeakedKey = true; // el CDN del volcado tampoco debe recibir la key

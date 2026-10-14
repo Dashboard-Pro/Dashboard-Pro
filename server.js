@@ -84,6 +84,15 @@ const inflight = new Map(); // key -> Promise
 const queue = [];
 let lastCallAt = 0;
 let draining = false;
+// Si todo lo que hay en la cola espera para reintentar, la cola duerme hasta el primero (hasta 45 s); lo que llegue
+// mientras tanto la despierta (enqueue → wakeDrain) en vez de esperar a que acabe la siesta. El hueco de 5,2 s entre
+// llamadas no se puede interrumpir: ese sigue con sleep().
+let wakeDrain = null;
+const nap = (ms) => new Promise((r) => {
+  const t = setTimeout(done, ms);
+  function done() { clearTimeout(t); wakeDrain = null; r(); }
+  wakeDrain = done;
+});
 let serverOffsetMs = 0; // hora del servidor - hora local
 const stats = { upstreamCalls: 0, cacheHits: 0, throttled: 0, retried: 0, lastError: null, lastOkAt: null };
 const errorLog = []; // últimos errores reales con su hora: { at, status, path }
@@ -113,6 +122,7 @@ const jobPriority = (j, t) => (j.bg ? (t - j.addedAt > BG_AGING_MS ? 1 : 2) : /\
 function enqueue(url) {
   return new Promise((resolve) => {
     queue.push({ url, resolve, notBefore: 0, retries: 0, bg: isBackground(), addedAt: Date.now() });
+    wakeDrain?.();
     drain();
   });
 }
@@ -138,7 +148,7 @@ async function drain() {
   while (queue.length) {
     const nowT = Date.now();
     if (pick(nowT) < 0) {
-      await sleep(Math.min(...queue.map((j) => j.notBefore)) - nowT);
+      await nap(Math.min(...queue.map((j) => j.notBefore)) - nowT);
       continue;
     }
     const wait = lastCallAt + MIN_GAP_MS - Date.now();
@@ -900,12 +910,15 @@ async function runRescan(farmId, me, keys) {
 }
 
 async function readBody(req, max = 1_000_000) {
-  let raw = "";
+  // Se juntan los bytes y se decodifica al final: sumar trozos como texto rompe una ñ o un emoji que caiga entre dos
+  const chunks = [];
+  let size = 0;
   for await (const chunk of req) {
-    raw += chunk;
-    if (raw.length > max) throw new Error("Cuerpo demasiado grande");
+    size += chunk.length;
+    if (size > max) throw new Error("Cuerpo demasiado grande");
+    chunks.push(chunk);
   }
-  return JSON.parse(raw || "{}");
+  return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
 }
 
 // ── Nube: cuentas, sincronización y premium (solo con SFL_MODE=cloud) ────────

@@ -720,6 +720,39 @@ async function cloudChecks(localPost, localFarm) {
       ok(hang.status === 504 && /no respondió/.test(hang.json?.error || ""), "SFL sin responder → 504 con mensaje claro (no se queda colgado)");
       ok((await req("/api/farm/12345")).status === 200, "tras un tiempo agotado la cola sigue funcionando");
     }
+    {
+      // Con todo en espera de reintento la cola duerme; lo que llega después la despierta (no espera los 4 s del reintento)
+      const P3 = 4202;
+      const c3 = spawn(process.execPath, [path.join(__dirname, "..", "server.js")], {
+        env: { ...process.env, PORT: String(P3), SFL_API_KEY: "sfl.demo", SFL_MIN_GAP_MS: "150", SFL_GAMEDATA_AUTO: "0", SFL_RETRY_MS: "4000,4000,4000",
+          SFL_UPSTREAM: `http://127.0.0.1:${MOCK}/community`, SFL_WORLD: "http://127.0.0.1:9/api", SFL_CONFIG: path.join(tmp, "q-config.json"), SFL_DATA_DIR: path.join(tmp, "q-data") },
+        stdio: "ignore",
+      });
+      try {
+        let up = false;
+        for (let i = 0; i < 50 && !up; i++) { up = await fetch(`http://127.0.0.1:${P3}/api/status`).then(() => true, () => false); if (!up) await new Promise((r) => setTimeout(r, 100)); }
+        fetch(`http://127.0.0.1:${P3}/api/farm/66666`).catch(() => {}); // se queda reintentando cada 4 s
+        await new Promise((r) => setTimeout(r, 600));
+        const t = Date.now(), ok3 = (await fetch(`http://127.0.0.1:${P3}/api/farm/12345`)).status === 200, ms = Date.now() - t;
+        ok(ok3 && ms < 2500, `un reintento en espera no frena lo que pide la página (${ms} ms)`);
+      } finally { c3.kill(); }
+    }
+    {
+      // Un POST que llega en dos trozos con una ñ partida por la mitad: se guarda bien (antes salía "�")
+      const http = require("node:http");
+      const name = "Ñandú 🌻";
+      const buf = Buffer.from(JSON.stringify({ id: "31337", name }));
+      const cut = buf.indexOf(Buffer.from("Ñ")) + 1; // entre los dos bytes de la Ñ
+      await new Promise((resolve, reject) => {
+        const r = http.request({ host: "127.0.0.1", port: PORT, path: "/api/friends", method: "POST", headers: { "content-type": "application/json", "content-length": buf.length } }, (res) => { res.resume(); res.on("end", resolve); });
+        r.on("error", reject);
+        r.write(buf.subarray(0, cut));
+        setTimeout(() => r.end(buf.subarray(cut)), 100);
+      });
+      ok((await req("/api/friends")).json?.["31337"]?.value?.name === name, "un carácter partido entre dos trozos del cuerpo llega entero");
+      await post("/api/friends", { id: "31337", remove: true });
+    }
+    ok(/AbortSignal\.timeout\(API_TIMEOUT_MS\)/.test(fs.readFileSync(path.join(root, "public", "js", "02-datos.js"), "utf8")), "el navegador pone tope de tiempo a cada petición (nada se queda cargando para siempre)");
 
     section("Archivos de data/ a salvo");
     {

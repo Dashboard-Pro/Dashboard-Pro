@@ -5,10 +5,17 @@
 /* ════════════════════════════════════════════════════════════════════════
    4. API y almacén de datos con caché
    ════════════════════════════════════════════════════════════════════════ */
+// Tope por petición: el servidor ya corta las llamadas a SFL (45 s + reintentos), esto es la red de seguridad para que un
+// módulo nunca se quede en "cargando…" para siempre (y el botón de refrescar vuelva a funcionar)
+const API_TIMEOUT_MS = 150_000;
 async function api(path) {
   setBusy(+1);
   try {
-    const r = await fetch(path);
+    let r;
+    try { r = await fetch(path, { signal: AbortSignal.timeout(API_TIMEOUT_MS) }); } catch (e) {
+      if (e.name !== "TimeoutError") throw Object.assign(new Error("No se pudo contactar con el dashboard: ¿está abierto?"), { status: 0 });
+      throw Object.assign(new Error(`El servidor no respondió en ${fmt(API_TIMEOUT_MS / 60_000, 1)} min: vuelve a intentarlo`), { status: 0 });
+    }
     const off = r.headers.get("x-server-offset");
     if (off != null) S.clockOffset = Number(off) || 0;
     // Antigüedad real del dato: si la API falla, el proxy sirve su última copia buena (x-cache: stale)

@@ -1,0 +1,6 @@
+{
+"El servidor no respondió en {0} min: vuelve a intentarlo":"The server didn't respond within {0} min: try again",
+"No se pudo contactar con el dashboard: ¿está abierto?":"Couldn't reach the dashboard: is it running?",
+"Sunflower Land no respondió en {0} s: se reintentará.":"Sunflower Land didn't respond within {0} s: it will retry.",
+"No se pudo leer tu patrimonio guardado: inténtalo en un momento":"Couldn't read your saved net worth: try again in a moment"
+}
