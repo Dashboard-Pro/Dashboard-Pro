@@ -233,7 +233,15 @@ function estimateTag(r) {
     const lines = p.groups.map((g) => `${g === pk.group ? "▸ " : ""}${g.label}: ${g.floors.length ? `${g.floors.length} a la venta desde ${fmt(g.floor)}` : "ninguno a la venta"}, ${g.sales.length ? `${g.sales.length} venta${g.sales.length === 1 ? "" : "s"} (mediana ${fmt(g.median)})${g.dropped ? ` sin contar ${g.dropped} rara${g.dropped === 1 ? "" : "s"}` : ""}` : "sin ventas"}.`).join(" ");
     const lvTxt = pk.level ? ` de nivel ${pk.level.from}–${pk.level.to} (el tuyo es ${pk.level.my}; ${pk.level.n} de ${pk.level.known} con nivel conocido)` : "";
     const how = pk.basis === "ventas" ? `mediana de ventas de ${pk.group.label}${lvTxt}` : `el más barato a la venta de ${pk.group.label}${lvTxt}`;
-    return `<span class="tag" data-tip="${esc(`Valorado por su boost|Tu pet: ${petBoostText(p) || "sin boost"}. Sin listados ni ventas propias, vale ${fmt(pk.value)} FLOWER: ${how}. ${lines}|${pk.level ? "por nivel parecido al tuyo" : "sin nivel: el de los pets del mercado se va guardando poco a poco"} · rasgos visuales no incluidos · ventas = última venta de cada pet del informe`)}">${pk.basis === "ventas" ? "ventas" : "floor"} ${esc(pk.group.key === "t" ? p.type : pk.group.key === "ab" ? "mismo boost" : pk.group.label)}</span>`;
+    // Si no se ajusta por nivel, se dice por qué (antes solo lo insinuaba el pie del tooltip)
+    const nl = pk.noLevel;
+    const noLvTxt = !nl ? "" : nl.my == null ? " Sin ajuste por nivel: no se conoce el nivel de tu pet."
+      : pk.basis === "ventas" && nl.total < nl.need ? ` Sin ajuste por nivel (el tuyo es ${nl.my}): solo cuentan ${nl.total} ventas y hacen falta ${nl.need} con nivel conocido para comparar por nivel.`
+      : pk.basis === "ventas" ? ` Sin ajuste por nivel (el tuyo es ${nl.my}): de esas ${nl.total} ventas, ${nl.known ? `solo ${nl.known} tienen` : "ninguna tiene aún"} nivel conocido y hacen falta ${nl.need}; los niveles del mercado se van guardando poco a poco y se ajustará solo.`
+        : ` Sin ajuste por nivel (el tuyo es ${nl.my}): ninguno de los ${nl.total} a la venta tiene nivel conocido aún; se van guardando poco a poco.`;
+    const lvTag = pk.level ? `<span class="tag green" data-tip="${esc(`Ajustado por nivel|Se usan los de nivel ${pk.level.from}–${pk.level.to} (el tuyo es ${pk.level.my}).|`)}">nivel ${pk.level.from}–${pk.level.to}</span>`
+      : nl ? `<span class="tag" data-tip="${esc(`Sin ajuste por nivel|${noLvTxt.trim()}|`)}">sin nivel${nl.my != null && pk.basis === "ventas" ? ` ${nl.known}/${nl.need}` : ""}</span>` : "";
+    return `<span class="tag" data-tip="${esc(`Valorado por su boost|Tu pet: ${petBoostText(p) || "sin boost"}. Sin listados ni ventas propias, vale ${fmt(pk.value)} FLOWER: ${how}.${noLvTxt} ${lines}|${pk.level ? "por nivel parecido al tuyo" : "sin ajuste por nivel"} · rasgos visuales no incluidos · ventas = última venta de cada pet del informe`)}">${pk.basis === "ventas" ? "ventas" : "floor"} ${esc(pk.group.key === "t" ? p.type : pk.group.key === "ab" ? "mismo boost" : pk.group.label)}</span> ${lvTag}`;
   }
   return `<span class="tag" data-tip="Precio estimado|No tiene listados ni ventas propias: se valora al floor de la colección (el ${colOf(r.key) === "pets" ? "pet" : "bud"} más barato a la venta). Uno con mejores rasgos puede valer bastante más.|">floor colección</span>`;
 }

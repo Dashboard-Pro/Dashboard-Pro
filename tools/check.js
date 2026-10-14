@@ -92,6 +92,11 @@ async function uiChecks() {
     const hit = (d) => /una sola columna en «Stock en las tiendas»/.test(d.replace(/&quot;/g, "\""));
     ok(hit(await brk(1)) || hit(await brk(2)), "la revisión de diseño detecta una rejilla rota (stock en una columna)");
   }
+  {
+    // Pet NFT valorado por su boost (el Dragon de la demo): si no se ajusta por nivel, la tabla lo dice y explica por qué
+    const d = (await dumpDom(browser, `${base}/?lang=es#nfts`, path.join(tmp, "ui-petlevel"))).replace(/&quot;/g, "\"");
+    ok(/>ventas Dragon[^<]*<\/span> <span class="tag" data-tip="Sin ajuste por nivel\|[^"]*hacen falta 3[^"]*">sin nivel \d\/3</.test(d), "un pet valorado sin ajuste por nivel lo dice en la tabla (y por qué)");
+  }
   // En el móvil: nada más ancho que la pantalla ni que se salga de su módulo
   for (let i = 0; i < pages.length; i += 4) {
     const batch = pages.slice(i, i + 4);

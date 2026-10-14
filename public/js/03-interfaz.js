@@ -114,6 +114,13 @@ function petTypeRef(items, id, myLevel = null) {
       pick = { ...pick, value: Math.min(...s.map((e) => e.p)), level: { my: myLevel, n: s.length, from: Math.min(...s.map((e) => e.lv)), to: Math.max(...s.map((e) => e.lv)), known: g.floorsL.length, total: g.floors.length } };
     }
   }
+  // Sin ajuste por nivel: por qué (para decirlo en la etiqueta en vez de callarlo). Ventas: hacen falta 3 con nivel conocido;
+  // listados: basta 1. Los niveles del mercado los va guardando el servidor poco a poco (refreshPetLevels).
+  if (pick && !pick.level) {
+    const sales = pick.basis === "ventas";
+    pick = { ...pick, noLevel: { my: myLevel > 0 ? myLevel : null, known: (sales ? pick.group.salesL : pick.group.floorsL).length,
+      need: sales ? 3 : 1, total: sales ? pick.group.sales.length : pick.group.floors.length } };
+  }
   return { ...me, groups, pick, typeFloor: pick?.value ?? null };
 }
 

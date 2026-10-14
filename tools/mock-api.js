@@ -73,6 +73,7 @@ function farm() {
     pets: {
       requestsGeneratedAt: Date.UTC(new Date(t0).getUTCFullYear(), new Date(t0).getUTCMonth(), new Date(t0).getUTCDate()),
       common: { Barkley: { name: "Barkley", energy: 40, requests: { food: ["Roast Veggies", "Kale Stew", "Pumpkin Soup"], foodFed: ["Roast Veggies"] } } },
+      nfts: demoPetNft(),
     },
     dailyRewards: { streaks: 23, chest: { collectedAt: t0 - 30 * H } },
     desert: demoDesert(),
@@ -181,6 +182,14 @@ function activity(prev) {
 }
 
 const day = (o = 0) => new Date(Date.now() - o * 86400_000).toISOString().slice(0, 10);
+
+// Un pet NFT propio (Dragon, nivel 20) sin listado ni venta: se valora por su boost con los Dragon vendidos del informe
+const DEMO_DRAGONS = () => { const P = G.petNfts; return Object.keys(P?.ids || {}).filter((id) => P.types[P.ids[id][0]] === "Dragon" && id !== "2513" && id !== "1"); };
+function demoPetNft() {
+  const id = DEMO_DRAGONS()[3];
+  if (!id) return {};
+  return { [id]: { id: Number(id), name: `Pet #${id}`, experience: 50 * 19 * 20, energy: 30, requests: { food: ["Kale Stew"], foodFed: [] } } };
+}
 
 // Granja "inestable" para el test de reintentos: falla con 502 las dos primeras veces
 let flakyCalls = 0;
