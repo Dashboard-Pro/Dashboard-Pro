@@ -681,6 +681,16 @@ async function cloudChecks(localPost, localFarm) {
         const fj = await fx2.json();
         ok(fx2.headers.get("x-cache") === "fallback" && fj.sfl?.usd === 0.16 && fj.gems?.["650"]?.sfl > 0, "sfl.world caído y sin copia: FLOWER en $/€ y gemas de reserva");
         ok((await fetch(`http://127.0.0.1:${P2}/api/ext/crafting`)).status === 200, "recetas de la Crafting Box desde la copia guardada");
+        // La cabecera del módulo dice de dónde sale el dato: Patrimonio usa el cambio a $/€ (aquí, de reserva)
+        const br = BROWSERS.find((b) => fs.existsSync(b));
+        if (br) {
+          const dom = await dumpDom(br, `http://127.0.0.1:${P2}/?lang=es#overview`, path.join(tmp, "ui-src-p2"));
+          ok(/class="tag sun src-tag" data-src-for="ov-wealth"[^>]*>fuente de reserva</.test(dom), "un módulo con datos de reserva lo marca en su cabecera");
+          const live = await dumpDom(br, `${base}/?lang=es#overview`, path.join(tmp, "ui-src-live"));
+          ok(live.includes("data-drawn") && !live.includes("src-tag"), "con todo en directo no sale ninguna marca");
+          // Abrir el Resumen guarda la foto de patrimonio del día: se quita para que "Patrimonio día a día" empiece de cero
+          fs.rmSync(path.join(tmp, "data", "wealth-121500.json"), { force: true });
+        }
       } finally { c2.kill(); }
     }
 

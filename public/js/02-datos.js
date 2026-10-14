@@ -148,7 +148,7 @@ const LOADERS = {
     for (const x of [...(d.collectibles || []), ...(d.wearables || [])]) {
       map[`${x.collection}-${x.id}`] = { supply: x.supply || null, boost: x.have_boost ? String(x.boost_text || "").trim() : "" };
     }
-    return { map, updatedAt: d.updatedAt };
+    return { map, updatedAt: d.updatedAt, source: d.source || "sfl.world" };
   }, 3600_000),
   fx: () => load("fx", () => api("/api/ext/exchange"), 900_000),
   // Nivel de los pets NFT del mercado (para valorar el tuyo con los de nivel parecido)
@@ -190,6 +190,7 @@ function mount(id, { deps = [], soft = [], render, loading = "block" }) {
       // Un <img> dentro de un <svg> el navegador lo saca fuera y descuadra el módulo (pasó en Próximas horas)
       if (html.includes("<img") && /<svg\b(?:(?!<\/svg>)[\s\S])*?<img\b/.test(html)) { console.error(`${id}: <img> dentro de <svg>`); markJsError(); }
       el.innerHTML = html;
+      markSource(el, entry);
     } catch (err) { console.error(err); markJsError(err); el.innerHTML = ErrorState(err, id); }
   };
   entry.run = () => {
@@ -212,6 +213,54 @@ function mount(id, { deps = [], soft = [], render, loading = "block" }) {
   RETRY[id] = entry.run;
   S.mounts.push(entry);
   entry.run();
+}
+// De dónde sale cada dato: el servidor marca con x-cache si sirve una copia guardada porque la fuente falló ("stale") o una
+// fuente de reserva ("fallback": CoinGecko, volcado oficial…). Si algún dato de un módulo viene así, su cabecera lo dice con
+// una etiqueta (y su tooltip explica cuál y desde cuándo); con todo en directo no se pinta nada.
+const SRC_INFO = {
+  farm: { name: "Tu granja", path: "/api/farm/" },
+  activity: { name: "Precios del mercado", path: "/api/data?type=marketplaceActivity", exact: true },
+  profile: { name: "Tu perfil del mercado", path: "type=marketplaceProfile" },
+  stats: { name: "Rankings", path: "type=statsLeaderboard" },
+  tickets: { name: "Ranking de tickets", path: "type=ticketLeaderboard" },
+  auctions: { name: "Subastas", path: "type=auctions" },
+  raffles: { name: "Sorteos", path: "type=raffles" },
+  discord: { name: "Anuncios de Discord", path: "type=discordAnnouncements" },
+  worldNfts: { name: "Suministro y boosts de NFTs", path: "/api/ext/nfts", fallback: "volcado oficial de todas las granjas y textos del juego" },
+  fx: { name: "Cambio de FLOWER a dólares/euros", path: "/api/ext/exchange", fallback: "precio de CoinGecko y paquetes de gemas guardados" },
+  opensea: { name: "Listados de OpenSea", path: "/api/ext/opensea" },
+  flowerRecipes: { name: "Recetas de cruce de flores", path: "/api/ext/flowers" },
+  craftRecipes: { name: "Recetas de la Crafting Box", path: "/api/ext/crafting" },
+  npcDeliveries: { name: "Pedidos de NPCs", path: "/api/ext/deliveries" },
+  worldAuctions: { name: "Historial de subastas", path: "/api/ext/auctions", fallback: "lista oficial de subastas" },
+};
+function srcOf(dep) {
+  const info = SRC_INFO[dep];
+  if (!info || !has(dep)) return null;
+  // Suministro de NFTs sin sfl.world: el propio loader tira del volcado (la petición falló, así que no hay x-cache)
+  if (dep === "worldNfts" && store.worldNfts.data.source === "dump") return { ...info, cache: "fallback", at: null };
+  let best = null;
+  for (const [p, v] of FETCHED) if ((info.exact ? p === info.path : p.includes(info.path)) && (!best || v.at > best.at)) best = v;
+  return best && (best.cache === "stale" || best.cache === "fallback") ? { ...info, ...best } : null;
+}
+function markSource(el, entry) {
+  const head = el.closest(".mod")?.querySelector(".mod-h");
+  if (!head) return;
+  const notes = [...new Set([...entry.deps, ...entry.soft])].map(srcOf).filter(Boolean);
+  let tag = head.querySelector(`.src-tag[data-src-for="${entry.id}"]`);
+  if (!notes.length) return tag?.remove();
+  if (!tag) {
+    tag = document.createElement("span");
+    tag.className = "tag sun src-tag";
+    tag.dataset.srcFor = entry.id;
+    const sub = head.querySelector(".sub");
+    if (sub) sub.after(tag); else head.append(tag);
+  }
+  const stale = notes.filter((n) => n.cache === "stale"), oldest = Math.min(...stale.map((n) => n.at));
+  tag.textContent = stale.length ? `copia de hace ${agoShort(Math.max(0, Date.now() - oldest))}` : "fuente de reserva";
+  tag.dataset.tip = `${stale.length ? "Copia guardada" : "Fuente de reserva"}|${notes.map((n) => n.cache === "stale"
+    ? `${n.name}: la fuente no responde; es lo último bueno que se guardó (hace ${agoShort(Math.max(0, Date.now() - n.at))}).`
+    : `${n.name}: la fuente principal no responde; datos de reserva (${n.fallback || "otra fuente"}), pueden ser menos completos.`).join(" · ")}|se reintenta solo`;
 }
 const repaint = (dep) => S.mounts.forEach((m) => (!dep || m.deps.includes(dep) || m.soft.includes(dep)) && m.paint());
 const rerun = () => S.mounts.forEach((m) => m.run());
