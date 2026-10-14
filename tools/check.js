@@ -621,6 +621,13 @@ async function cloudChecks(localPost, localFarm) {
     {
       const h = (await req("/api/dump/history?ids=3")).json;
       ok(h?.me?.length === 1 && h["3"]?.[0]?.level === 40 && h["3"][0].date, "evolución diaria de tu granja y tus amigos");
+      // La evolución se recuerda por archivo; si un resumen cambia (otro ordenador, volcado de nuevo) se vuelve a leer
+      const dd = path.join(tmp, "data", "dump"), df = path.join(dd, fs.readdirSync(dd).filter((f) => /^\d{4}-\d{2}-\d{2}\.json$/.test(f)).pop());
+      const orig = fs.readFileSync(df, "utf8"), doc = JSON.parse(orig);
+      doc.friends["3"].metrics.level = 41;
+      fs.writeFileSync(df, JSON.stringify(doc));
+      ok((await req("/api/dump/history?ids=3")).json?.["3"]?.[0]?.level === 41, "la evolución guardada en memoria ve los resúmenes que cambian");
+      fs.writeFileSync(df, orig);
       const lv = (await req("/api/friends/live/3")).json;
       ok(lv?.metrics?.level > 0 && lv.metrics.worth >= 0 && lv.at > 0, "un amigo en directo con las mismas métricas");
       ok((await req("/api/friends/live/abc")).status === 404, "ID en directo inválido rechazado");

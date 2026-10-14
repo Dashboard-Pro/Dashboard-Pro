@@ -25,9 +25,14 @@ const UPGRADES = new Set(["Toolshed", "Warehouse", "Ancient Tree", "Sacred Tree"
   "Refined Iron Rock", "Tempered Iron Rock", "Pure Gold Rock", "Prime Gold Rock"]);
 const band = (lvl) => BANDS.filter((b) => lvl >= b).pop();
 
+// Se recuerda mientras gamedata.js no cambie (570 KB: "ver en directo" a un amigo lo leía entero cada vez). Nadie lo modifica.
+let gameMemo = null; // { key, G }
 function loadGame(publicDir) {
-  const txt = fs.readFileSync(path.join(publicDir, "gamedata.js"), "utf8");
-  return JSON.parse(txt.slice(txt.indexOf("{"), txt.lastIndexOf("}") + 1));
+  const file = path.join(publicDir, "gamedata.js"), st = fs.statSync(file), key = `${file}|${st.size}-${st.mtimeMs}`;
+  if (gameMemo?.key === key) return gameMemo.G;
+  const txt = fs.readFileSync(file, "utf8");
+  gameMemo = { key, G: JSON.parse(txt.slice(txt.indexOf("{"), txt.lastIndexOf("}") + 1)) };
+  return gameMemo.G;
 }
 function levelOf(xp, L) {
   let lvl = 1;
@@ -101,13 +106,20 @@ function createNightly({ dataDir, publicDir, fetchData, getConfig, log = () => {
   const files = () => { try { return fs.readdirSync(dir).filter((f) => /^\d{4}-\d{2}-\d{2}\.json$/.test(f)).sort(); } catch { return []; } };
   const read = (date) => { try { return JSON.parse(fs.readFileSync(path.join(dir, `${date}.json`), "utf8")); } catch { return null; } };
 
-  // Precio por nombre con el último día del archivo de precios (floor), para el patrimonio
+  // Firma de un archivo (tamaño y fecha): las memorias de abajo solo se rehacen si el archivo cambió
+  const sigOf = (file) => { try { const st = fs.statSync(file); return `${st.size}-${st.mtimeMs}`; } catch { return null; } };
+
+  // Precio por nombre con el último día del archivo de precios (floor), para el patrimonio. Se recuerda mientras el archivo
+  // del mes no cambie: "ver en directo" a un amigo no relee 1-2 MB cada vez.
+  let pricesMemo = null; // { key, G, out }
   function prices(G) {
     const out = { price: {}, wearPrice: {}, petGroup: {}, petGroupN: {}, petOwn: {}, petFloor: null, budFloor: null };
     const months = (() => { try { return fs.readdirSync(dataDir).filter((f) => /^prices-\d{4}-\d{2}\.json$/.test(f)).sort(); } catch { return []; } })();
     if (!months.length) return out;
+    const file = path.join(dataDir, months.pop()), key = `${file}|${sigOf(file)}`;
+    if (pricesMemo?.key === key && pricesMemo.G === G) return pricesMemo.out;
     let m;
-    try { m = JSON.parse(fs.readFileSync(path.join(dataDir, months.pop()), "utf8")); } catch { return out; }
+    try { m = JSON.parse(fs.readFileSync(file, "utf8")); } catch { return out; }
     const day = m[Object.keys(m).sort().pop()] || {};
     for (const [n, id] of Object.entries(G.itemIds || {})) if (day[`collectibles-${id}`]) out.price[n] = day[`collectibles-${id}`];
     for (const [n, id] of Object.entries(G.wearableIds || {})) if (day[`wearables-${id}`]) out.wearPrice[n] = day[`wearables-${id}`];
@@ -118,6 +130,7 @@ function createNightly({ dataDir, publicDir, fetchData, getConfig, log = () => {
     }
     out.petFloor = day["_col-pets"] || null;
     out.budFloor = day["_col-buds"] || null;
+    pricesMemo = { key, G, out };
     return out;
   }
 
@@ -322,15 +335,24 @@ function createNightly({ dataDir, publicDir, fetchData, getConfig, log = () => {
 
   // Evolución día a día (de los resúmenes guardados) de tu granja y de tus amigos → { id: [{ date, …métricas }] }
   const HIST_KEYS = ["level", "worth", "flower", "expansions", "nfts", "skills"];
+  // Cada resumen (~175 KB, uno por día) se lee una vez y se recuerdan solo sus filas de evolución: antes se releían todos
+  // en cada consulta y crecía cada día.
+  const histMemo = new Map(); // "AAAA-MM-DD.json" → { sig, me, friends: [[id, fila]] }
   function history(ids = []) {
     const want = new Set(ids.map(String));
     const out = { me: [] };
     for (const f of files()) {
-      const d = read(f.slice(0, 10));
-      if (!d) continue;
-      const pick = (row) => ({ date: d.date, ...Object.fromEntries(HIST_KEYS.map((k) => [k, row.metrics[k]])), pctWorth: row.pct?.worth ?? null, pctLevel: row.pct?.level ?? null });
-      if (d.me) out.me.push(pick(d.me));
-      for (const [id, row] of Object.entries(d.friends || {})) if (!want.size || want.has(id)) (out[id] ||= []).push(pick(row));
+      const sig = sigOf(path.join(dir, f));
+      let h = histMemo.get(f);
+      if (!h || h.sig !== sig) {
+        const d = read(f.slice(0, 10));
+        if (!d) continue;
+        const pick = (row) => ({ date: d.date, ...Object.fromEntries(HIST_KEYS.map((k) => [k, row.metrics[k]])), pctWorth: row.pct?.worth ?? null, pctLevel: row.pct?.level ?? null });
+        h = { sig, me: d.me ? pick(d.me) : null, friends: Object.entries(d.friends || {}).map(([id, row]) => [id, pick(row)]) };
+        histMemo.set(f, h);
+      }
+      if (h.me) out.me.push(h.me);
+      for (const [id, row] of h.friends) if (!want.size || want.has(id)) (out[id] ||= []).push(row);
     }
     return out;
   }

@@ -724,6 +724,10 @@ function dayFromReport(report, flowerPrice, own = {}) {
   }
   return day;
 }
+// El mes en curso se queda en memoria tras guardarlo: la foto de cada 10 min no relee el archivo (~1-2 MB a final de mes)
+// salvo que otro programa lo haya cambiado (git, el otro ordenador: tamaño o fecha distintos)
+let priceMonthMemo = null; // { file, sig, month }
+const fileSig = (file) => { const st = fs.statSync(file); return `${st.size}-${st.mtimeMs}`; };
 function recordPrices(body) {
   if (Date.now() - lastPriceWrite < 10 * 60_000) return;
   let d;
@@ -732,10 +736,16 @@ function recordPrices(body) {
   if (!date || !report?.items) return;
   const file = path.join(DATA_DIR, `prices-${date.slice(0, 7)}.json`);
   let month;
-  try { month = readJson(file, {}); } catch { return; } // bloqueado: se guarda en el próximo informe
+  try {
+    const sig = fs.existsSync(file) ? fileSig(file) : null;
+    month = priceMonthMemo?.file === file && priceMonthMemo.sig === sig ? priceMonthMemo.month : readJson(file, {});
+  } catch { return; } // bloqueado: se guarda en el próximo informe
   month[date] = dayFromReport(report, d.flowerPrice, ownListingPrices());
   writeJson(file, month);
-  priceIdx.delete(path.basename(file));
+  const sig = fileSig(file);
+  priceMonthMemo = { file, sig, month };
+  // El índice de las series se rehace desde lo que ya está en memoria (sin volver a leer ni parsear el archivo)
+  priceIdx.set(path.basename(file), { sig, idx: indexMonth(month) });
   lastPriceWrite = Date.now();
 }
 
@@ -789,11 +799,15 @@ function priceMonthIndex(f) {
   const file = path.join(DATA_DIR, f), st = fs.statSync(file), sig = `${st.size}-${st.mtimeMs}`;
   const hit = priceIdx.get(f);
   if (hit?.sig === sig) return hit.idx;
+  const idx = indexMonth(JSON.parse(fs.readFileSync(file, "utf8")));
+  priceIdx.set(f, { sig, idx });
+  return idx;
+}
+function indexMonth(month) {
   const idx = Object.create(null);
-  for (const [date, day] of Object.entries(JSON.parse(fs.readFileSync(file, "utf8"))).sort()) {
+  for (const [date, day] of Object.entries(month).sort()) {
     for (const [k, v] of Object.entries(day || {})) if (v != null) (idx[k] ||= []).push(date, v);
   }
-  priceIdx.set(f, { sig, idx });
   return idx;
 }
 // Serie diaria de varios items → { key: [{date, floor}] }
