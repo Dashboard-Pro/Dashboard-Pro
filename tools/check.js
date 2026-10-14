@@ -304,7 +304,7 @@ if (ageDays > 30) console.log(`  ! gamedata.js tiene ${Math.round(ageDays)} día
 // ── 2-4. Servidor con la demo ─────────────────────────────────────────────────
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "sfl-check-"));
 const child = spawn(process.execPath, [path.join(__dirname, "demo.js")], {
-  env: { ...process.env, PORT: String(PORT), MOCK_PORT: String(MOCK), SFL_RETRY_MS: "50,50,50", SFL_GAMEDATA_AUTO: "0", NOTIFY_WEBHOOK_OVERRIDE: `http://127.0.0.1:${MOCK}/hook`, SFL_NOTIFY_GAP_MS: "1", SFL_CONFIG: path.join(tmp, "config.json"), SFL_DATA_DIR: path.join(tmp, "data") },
+  env: { ...process.env, PORT: String(PORT), MOCK_PORT: String(MOCK), SFL_RETRY_MS: "50,50,50", SFL_GAMEDATA_AUTO: "0", NOTIFY_WEBHOOK_OVERRIDE: `http://127.0.0.1:${MOCK}/hook`, SFL_NOTIFY_GAP_MS: "1", SFL_UPSTREAM_TIMEOUT_MS: "1500", SFL_CONFIG: path.join(tmp, "config.json"), SFL_DATA_DIR: path.join(tmp, "data") },
   stdio: process.env.CHECK_VERBOSE ? "inherit" : "ignore",
 });
 
@@ -714,6 +714,31 @@ async function cloudChecks(localPost, localFarm) {
     ok(st2.lastOkAt >= st2.lastError.at, "tras el error hubo una respuesta correcta (resuelto)");
     ok(st2.errorsLastHour >= 2, "recuento de errores de la última hora");
     ok((await req("/api/data?type=tradeable&collection=collectibles&id=999999")).status !== 500, "un 404/400 normal no rompe nada");
+    {
+      // Una conexión que nunca contesta: tope de tiempo (SFL_UPSTREAM_TIMEOUT_MS) y la cola sigue atendiendo lo demás
+      const hang = await req("/api/farm/88888");
+      ok(hang.status === 504 && /no respondió/.test(hang.json?.error || ""), "SFL sin responder → 504 con mensaje claro (no se queda colgado)");
+      ok((await req("/api/farm/12345")).status === 200, "tras un tiempo agotado la cola sigue funcionando");
+    }
+
+    section("Archivos de data/ a salvo");
+    {
+      const dataDir = path.join(tmp, "data");
+      fs.writeFileSync(path.join(dataDir, "trades-4242.json"), '{"trades":{"a":{"id":"a"'); // cortado a mitad
+      const r = await post("/api/history", { farmId: "4242", trades: [{ id: "n1", itemId: 1 }] });
+      const kept = fs.readdirSync(dataDir).filter((f) => f.startsWith("trades-4242.json.danado-"));
+      ok(r.status === 200 && kept.length === 1, "un archivo dañado se aparta (.danado-…) en vez de pisarlo");
+      ok(kept.length === 1 && fs.readFileSync(path.join(dataDir, kept[0]), "utf8").includes('"a"'), "la copia apartada conserva lo que había");
+      ok(JSON.parse(fs.readFileSync(path.join(dataDir, "trades-4242.json"), "utf8")).trades.n1, "y se sigue guardando en uno nuevo");
+      ok(!fs.readdirSync(dataDir).some((f) => f.endsWith(".tmp")), "la escritura segura no deja .tmp");
+      // Caché de series de precios: si otro programa (git, el otro ordenador) cambia el archivo del mes, se vuelve a leer
+      const pf = fs.readdirSync(dataDir).filter((f) => /^prices-\d{4}-\d{2}\.json$/.test(f)).sort().pop();
+      const month = JSON.parse(fs.readFileSync(path.join(dataDir, pf), "utf8"));
+      const day = Object.keys(month).sort().pop();
+      month[day]["_test-cache"] = 7;
+      fs.writeFileSync(path.join(dataDir, pf), JSON.stringify(month));
+      ok((await req("/api/prices?keys=_test-cache")).json?.series?.["_test-cache"]?.[0]?.floor === 7, "las series de precios ven los cambios hechos fuera del servidor");
+    }
 
     await uiChecks();
 

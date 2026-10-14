@@ -352,6 +352,8 @@ http.createServer((req, res) => {
     req.on("end", () => { try { hookLog.push(JSON.parse(b)); } catch { /* ignorar */ } res.writeHead(204); res.end(); });
     return;
   }
+  // Granja que nunca contesta (test del tope de tiempo: la cola no debe quedarse parada)
+  if (url.pathname === "/community/farms/88888") return;
   if (url.pathname === "/hook/log") { res.writeHead(200, { "content-type": "application/json" }); return res.end(JSON.stringify(hookLog)); }
   if (url.pathname.startsWith("/cdn/")) {
     if (req.headers["x-api-key"]) worldLeakedKey = true; // el CDN del volcado tampoco debe recibir la key

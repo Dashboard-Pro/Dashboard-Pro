@@ -427,7 +427,8 @@ try {
     if (imports[v]) url = imports[v];
     else if (v.startsWith("SUNNYSIDE.")) url = sunnyMap[v.slice(10)] || null;
     else {
-      const c = v.match(/^CROP_LIFECYCLE\["Basic Biome"\]\.(?:"?([\w ]+)"?|\["([^"]+)"\])\.(crop|seed)$/);
+      // CROP_LIFECYCLE["Basic Biome"].Sunflower.crop o CROP_LIFECYCLE["Basic Biome"]["Crystal Leaf"].crop
+      const c = v.match(/^CROP_LIFECYCLE\["Basic Biome"\](?:\.(\w+)|\["([^"]+)"\])\.(crop|seed)$/);
       const dir = c && cropDir[c[1] ?? c[2]];
       if (dir) url = `g:crops/${dir}/${c[3]}.png`;
     }

@@ -51,7 +51,7 @@ if (process.env.PORT) config.port = Number(process.env.PORT);
 function saveConfig(patch) {
   config = { ...config, ...patch };
   if (CLOUD) return; // la nube se configura solo con variables de entorno
-  fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+  writeJson(CONFIG_FILE, config, 2);
 }
 
 // ── Modo ─────────────────────────────────────────────────────────────────────
@@ -91,6 +91,7 @@ const errorLog = []; // últimos errores reales con su hora: { at, status, path 
 // Errores de la API que merecen reintento: fallos del servidor de SFL/Cloudflare (5xx) o de red.
 const isTransient = (status) => status >= 500;
 // SFL_RETRY_MS permite acortarlos en los tests (p. ej. "50,50,50")
+const UPSTREAM_TIMEOUT_MS = Number(process.env.SFL_UPSTREAM_TIMEOUT_MS) || 45_000; // los informes antiguos del mercado pesan varios MB
 const RETRY_DELAYS = process.env.SFL_RETRY_MS ? process.env.SFL_RETRY_MS.split(",").map(Number) : [5_000, 15_000, 45_000];
 
 function recordError(status, path) {
@@ -170,7 +171,8 @@ async function callUpstream(url) {
   stats.upstreamCalls++;
   const sentAt = Date.now();
   try {
-    const r = await fetch(url, { headers: { "x-api-key": config.apiKey || "" } });
+    // Con tope de tiempo: la cola va de una en una y una conexión que nunca contesta la dejaría parada para siempre
+    const r = await fetch(url, { headers: { "x-api-key": config.apiKey || "" }, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
     const body = await r.text();
     const date = r.headers.get("date");
     if (date) {
@@ -184,6 +186,10 @@ async function callUpstream(url) {
     else if (r.ok) stats.lastOkAt = Date.now();
     return { status: r.status, body };
   } catch (err) {
+    if (err.name === "TimeoutError") {
+      recordError("tiempo", url.replace(UPSTREAM, ""));
+      return { status: 504, body: JSON.stringify({ error: `Sunflower Land no respondió en ${Math.round(UPSTREAM_TIMEOUT_MS / 1000)} s: se reintentará.` }) };
+    }
     recordError("red", url.replace(UPSTREAM, ""));
     return { status: 502, body: JSON.stringify({ error: "No se pudo contactar con Sunflower Land: sin conexión a internet o la API está caída." }) };
   }
@@ -317,7 +323,7 @@ function extDiskRead(key) {
   try { const d = JSON.parse(fs.readFileSync(extFile(key), "utf8")); return d && d.status === 200 && typeof d.body === "string" ? d : null; } catch { return null; }
 }
 function extDiskWrite(key, entry) {
-  try { fs.mkdirSync(path.dirname(extFile(key)), { recursive: true }); fs.writeFileSync(extFile(key), JSON.stringify(entry)); } catch { /* sin disco: solo memoria */ }
+  try { writeJson(extFile(key), entry); } catch { /* sin disco: solo memoria */ }
 }
 async function extCached(key, url, ttl, parse) {
   let hit = cache.get(key);
@@ -510,13 +516,32 @@ function status() {
 // ── Archivo de operaciones ───────────────────────────────────────────────────
 // La API solo devuelve tus 50 últimas operaciones: las vamos guardando para no perder ninguna.
 const DATA_DIR = process.env.SFL_DATA_DIR || path.join(ROOT, "data");
+// Escritura segura: primero a un .tmp y luego se renombra encima, así un apagón o OneDrive a mitad nunca dejan el
+// archivo a medias. Si Windows no deja renombrar (archivo abierto por otro programa), se escribe directamente.
+function writeJson(file, obj, space) {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const txt = JSON.stringify(obj, null, space), tmp = `${file}.${process.pid}.tmp`;
+  fs.writeFileSync(tmp, txt);
+  try { fs.renameSync(tmp, file); } catch { fs.writeFileSync(file, txt); try { fs.unlinkSync(tmp); } catch { /* ya no está */ } }
+}
+// Lectura que no confunde "no existe" con "dañado". Si no existe → `fallback`. Si está dañado se aparta tal cual
+// (<archivo>.danado-<fecha>) antes de que la próxima escritura lo pise con solo lo nuevo, y se avisa. Cualquier otro
+// fallo de lectura (bloqueado, sin permiso) se lanza: mejor no guardar que guardar encima de lo que no se pudo leer.
+function readJson(file, fallback) {
+  let txt;
+  try { txt = fs.readFileSync(file, "utf8"); } catch (e) { if (e.code === "ENOENT") return fallback; throw e; }
+  try { return JSON.parse(txt); } catch {
+    const keep = `${file}.danado-${new Date().toISOString().replace(/[:.]/g, "-")}`;
+    fs.renameSync(file, keep); // si no se puede apartar, se lanza: no se escribe encima
+    recordError("archivo dañado", path.basename(file));
+    console.log(`  ⚠ ${path.basename(file)} estaba dañado: se ha apartado como ${path.basename(keep)} y se empieza uno nuevo.`);
+    return fallback;
+  }
+}
 const archiveFile = (farmId) => path.join(DATA_DIR, `trades-${String(farmId).replace(/[^A-Za-z0-9]/g, "")}.json`);
 function readArchive(farmId) {
-  try {
-    return JSON.parse(fs.readFileSync(archiveFile(farmId), "utf8"));
-  } catch {
-    return { trades: {} };
-  }
+  const a = readJson(archiveFile(farmId), null);
+  return a && typeof a.trades === "object" ? a : { trades: {} };
 }
 const who = (x) => (x ? { id: x.id, username: x.username } : undefined);
 function archiveTrades(farmId, trades, via) {
@@ -532,9 +557,8 @@ function archiveTrades(farmId, trades, via) {
     added++;
   }
   if (added) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
     a.updatedAt = Date.now();
-    fs.writeFileSync(archiveFile(farmId), JSON.stringify(a));
+    writeJson(archiveFile(farmId), a);
     cloudSyncSoon();
   }
   return added;
@@ -582,7 +606,7 @@ const petTraits = () => gameData()?.petNfts || null;
 // = { id: { level, at } }; los listados se refrescan cada semana y el resto cada mes. Así el dashboard valora tu pet con los
 // del mismo boost y nivel parecido.
 const petLevelsFile = () => path.join(DATA_DIR, "pet-levels.json");
-function readPetLevels() { try { return JSON.parse(fs.readFileSync(petLevelsFile(), "utf8")); } catch { return {}; } }
+function readPetLevels() { try { return readJson(petLevelsFile(), {}); } catch { return {}; } }
 let petLevelsBusy = false;
 // La consulta de pets se frena antes que las demás (429): 30 por tanda, 8 s extra entre una y otra y, si frena, se para.
 const PET_LEVEL_PAUSE_MS = Number(process.env.SFL_PET_PAUSE_MS ?? 8000);
@@ -593,7 +617,7 @@ async function refreshPetLevels(max = 30) {
     const a = await cached("data:type=marketplaceActivity", `${UPSTREAM}/data?type=marketplaceActivity`, TTL.marketplaceActivity);
     if (a.status !== 200) return 0;
     const [, report] = Object.entries(JSON.parse(a.body).data?.reports || {}).sort().pop() || [];
-    const levels = readPetLevels(), t = Date.now();
+    const levels = readJson(petLevelsFile(), {}), t = Date.now(); // si no se puede leer, se lanza y no se guarda encima
     const cand = Object.entries(report?.items || {}).map(([k, it]) => ({ id: k.match(/^pets-(\d+)$/)?.[1], listed: it.floor > 0 && it.listingCount > 0, sold: it.latestSale > 0 }))
       .filter((x) => x.id && (x.listed || x.sold));
     const stale = (x) => { const l = levels[x.id]; return !l || t - l.at > (x.listed ? 7 : 30) * 86400_000; };
@@ -609,7 +633,7 @@ async function refreshPetLevels(max = 30) {
       try { lv = JSON.parse(r.body)?.data?.level?.level; } catch { /* respuesta ilegible */ }
       if (lv > 0) { levels[x.id] = { level: lv, at: Date.now() }; n++; }
     }
-    if (n) { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(petLevelsFile(), JSON.stringify(levels)); }
+    if (n) writeJson(petLevelsFile(), levels);
     if (n) console.log(`  [pets] nivel de ${n} pets del mercado guardado (${Object.keys(levels).length} en total)`);
     return n;
   } finally { petLevelsBusy = false; }
@@ -697,11 +721,11 @@ function recordPrices(body) {
   const [date, report] = Object.entries(d?.reports || {}).sort().pop() || [];
   if (!date || !report?.items) return;
   const file = path.join(DATA_DIR, `prices-${date.slice(0, 7)}.json`);
-  let month = {};
-  try { month = JSON.parse(fs.readFileSync(file, "utf8")); } catch { /* mes nuevo */ }
+  let month;
+  try { month = readJson(file, {}); } catch { return; } // bloqueado: se guarda en el próximo informe
   month[date] = dayFromReport(report, d.flowerPrice, ownListingPrices());
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  fs.writeFileSync(file, JSON.stringify(month));
+  writeJson(file, month);
+  priceIdx.delete(path.basename(file));
   lastPriceWrite = Date.now();
 }
 
@@ -715,14 +739,14 @@ async function backfillPrices(maxDays = 30) {
   backfillBusy = true;
   try {
     const metaFile = path.join(DATA_DIR, "prices-meta.json");
-    let meta = {};
-    try { meta = JSON.parse(fs.readFileSync(metaFile, "utf8")); } catch { /* aún no */ }
+    let meta = readJson(metaFile, {});
     if (meta.complete) return 0;
     const files = (() => { try { return fs.readdirSync(DATA_DIR).filter((x) => /^prices-\d{4}-\d{2}\.json$/.test(x)).sort(); } catch { return []; } })();
     if (!files.length) return 0; // sin foto de hoy aún: primero que se guarde algo
-    const firstMonth = JSON.parse(fs.readFileSync(path.join(DATA_DIR, files[0]), "utf8"));
+    const firstMonth = readJson(path.join(DATA_DIR, files[0]), {});
+    if (!Object.keys(firstMonth).length) return 0; // estaba dañado y se ha apartado: se sigue en la próxima tanda
     let t = Date.parse(Object.keys(firstMonth).sort()[0] + "T00:00:00Z") - 86400_000;
-    const months = {}, read = (ym) => (months[ym] ||= (() => { try { return JSON.parse(fs.readFileSync(path.join(DATA_DIR, `prices-${ym}.json`), "utf8")); } catch { return {}; } })());
+    const months = {}, read = (ym) => (months[ym] ||= readJson(path.join(DATA_DIR, `prices-${ym}.json`), {}));
     let n = 0, empty = 0;
     while (n < maxDays) {
       const date = new Date(t).toISOString().slice(0, 10);
@@ -741,25 +765,39 @@ async function backfillPrices(maxDays = 30) {
       }
       t -= 86400_000;
     }
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-    for (const [ym, month] of Object.entries(months)) fs.writeFileSync(path.join(DATA_DIR, `prices-${ym}.json`), JSON.stringify(month));
-    if (meta.complete || n) fs.writeFileSync(metaFile, JSON.stringify(meta.complete ? meta : { ...meta, at: Date.now() }));
+    for (const [ym, month] of Object.entries(months)) { writeJson(path.join(DATA_DIR, `prices-${ym}.json`), month); priceIdx.delete(`prices-${ym}.json`); }
+    if (meta.complete || n) writeJson(metaFile, meta.complete ? meta : { ...meta, at: Date.now() });
     if (n) console.log(`  [precios] ${n} días antiguos del mercado recuperados${meta.complete ? ` (completo desde ${meta.earliest})` : ""}`);
     return n;
   } finally { backfillBusy = false; }
 }
-// Serie diaria de varios items leyendo cada archivo mensual una sola vez → { key: [{date, floor}] }
+// Cada archivo mensual se lee una vez y se guarda en memoria ya ordenado por item (item → [fecha, floor, fecha, floor…]):
+// releerlos todos en cada petición tardaba ~0,7 s con el servidor parado y crecía cada mes (~20 MB en memoria con un año).
+// Se invalida al guardar desde aquí y, si otro programa lo cambia (git, el otro ordenador), por tamaño y fecha del archivo.
+const priceIdx = new Map(); // "prices-AAAA-MM.json" → { sig, idx }
+function priceMonthIndex(f) {
+  const file = path.join(DATA_DIR, f), st = fs.statSync(file), sig = `${st.size}-${st.mtimeMs}`;
+  const hit = priceIdx.get(f);
+  if (hit?.sig === sig) return hit.idx;
+  const idx = Object.create(null);
+  for (const [date, day] of Object.entries(JSON.parse(fs.readFileSync(file, "utf8"))).sort()) {
+    for (const [k, v] of Object.entries(day || {})) if (v != null) (idx[k] ||= []).push(date, v);
+  }
+  priceIdx.set(f, { sig, idx });
+  return idx;
+}
+// Serie diaria de varios items → { key: [{date, floor}] }
 function priceSeriesMany(keys) {
   const out = Object.fromEntries(keys.map((k) => [k, []]));
   let files = [];
   try { files = fs.readdirSync(DATA_DIR).filter((f) => /^prices-\d{4}-\d{2}\.json$/.test(f)).sort(); } catch { return out; }
   for (const f of files) {
-    try {
-      const month = JSON.parse(fs.readFileSync(path.join(DATA_DIR, f), "utf8"));
-      for (const [date, day] of Object.entries(month).sort()) {
-        for (const k of keys) if (day[k] != null) out[k].push({ date, floor: day[k] });
-      }
-    } catch { /* archivo dañado: se ignora */ }
+    let idx;
+    try { idx = priceMonthIndex(f); } catch { continue; } // archivo dañado: se ignora
+    for (const k of keys) {
+      const s = idx[k];
+      if (s) for (let i = 0; i < s.length; i += 2) out[k].push({ date: s[i], floor: s[i + 1] });
+    }
   }
   return out;
 }
@@ -768,11 +806,10 @@ const priceSeries = (key) => priceSeriesMany([key])[key];
 // ── Costes introducidos a mano ───────────────────────────────────────────────
 const COSTS_FILE = path.join(DATA_DIR, "costs.json");
 function readCosts() {
-  try { return JSON.parse(fs.readFileSync(COSTS_FILE, "utf8")); } catch { return {}; }
+  return readJson(COSTS_FILE, {});
 }
 function writeCosts(costs) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  fs.writeFileSync(COSTS_FILE, JSON.stringify(costs, null, 1));
+  writeJson(COSTS_FILE, costs, 1);
 }
 // ── Avisos a Discord (webhook del propio jugador) ────────────────────────────
 const DISCORD_HOOK_RE = /^https:\/\/(?:(?:ptb|canary)\.)?discord(?:app)?\.com\/api\/webhooks\/\d{5,25}\/[\w-]{20,100}$/;
@@ -806,7 +843,7 @@ function queueNotify(lines) {
 }
 
 const FRIENDS_FILE = path.join(DATA_DIR, "friends.json");
-function readFriends() { try { return JSON.parse(fs.readFileSync(FRIENDS_FILE, "utf8")); } catch { return {}; } }
+function readFriends() { return readJson(FRIENDS_FILE, {}); }
 const visibleCosts = (costs) => Object.fromEntries(Object.entries(costs).filter(([, v]) => v?.value != null));
 
 // Consulta el perfil cada 20 min aunque el dashboard esté cerrado en el navegador
@@ -1025,8 +1062,7 @@ async function handleApi(req, res, url) {
     if (!/^\d{1,20}$/.test(id)) return send(res, 400, { error: "ID de granja inválido" });
     const all = readFriends();
     all[id] = body.remove ? { value: null, at: Date.now() } : { value: { name: String(body.name || "").slice(0, 40) || null }, at: Date.now() };
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-    fs.writeFileSync(FRIENDS_FILE, JSON.stringify(all, null, 1));
+    writeJson(FRIENDS_FILE, all, 1);
     cloudSyncSoon();
     return send(res, 200, visibleCosts(all));
   }
@@ -1146,8 +1182,8 @@ async function handleApi(req, res, url) {
     const farmId = String(url.searchParams.get("farmId") || "");
     if (!/^\d{1,20}$/.test(farmId)) return send(res, 400, { error: "farmId inválido" });
     const file = path.join(DATA_DIR, `wealth-${farmId}.json`);
-    let doc = {};
-    try { doc = JSON.parse(fs.readFileSync(file, "utf8")); } catch { /* aún no hay */ }
+    let doc;
+    try { doc = readJson(file, {}); } catch { return send(res, 503, { error: "No se pudo leer tu patrimonio guardado: inténtalo en un momento" }); }
     if (req.method !== "POST") return send(res, 200, doc);
     let body;
     try { body = await readBody(req); } catch { return send(res, 400, { error: "JSON inválido" }); }
@@ -1156,8 +1192,7 @@ async function handleApi(req, res, url) {
     const items = Object.fromEntries(Object.entries(s.items || {}).filter(([k, v]) => /^[\w|*# -]{1,80}$/.test(k) && Array.isArray(v)).slice(0, 400)
       .map(([k, [q, v]]) => [k, [Number(q) || 0, Number(v) || 0]]));
     doc[s.date] = { total: s.total, balance: Number(s.balance) || 0, inv: Number(s.inv) || 0, items, at: Date.now() };
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-    fs.writeFileSync(file, JSON.stringify(doc));
+    writeJson(file, doc);
     cloudSyncSoon();
     return send(res, 200, { ok: true, days: Object.keys(doc).length });
   }

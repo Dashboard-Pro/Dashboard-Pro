@@ -13,5 +13,7 @@ dist/
 data/ext-cache/
 # Registro del servidor en modo app (sin consola)
 dashboard.log
+# Escritura segura de data/ (archivo temporal mientras se guarda)
+*.tmp
 # Historial de cada jugador: se queda en su ordenador
 data/
