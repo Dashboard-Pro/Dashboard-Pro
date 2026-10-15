@@ -48,5 +48,8 @@
 "no suman":"not counted",
 "{0} tienen mercado pero sin listados ni ventas: no se sabe cuánto valen.":"{0} have a market but no listings or sales: their value is unknown.",
 "{0}: tienen mercado pero ahora mismo nadie los vende ni hay ventas registradas, así que no se sabe cuánto valen. No suman al total (no es que valgan 0).":"{0}: they have a market but right now nobody is selling them and there are no recorded sales, so their value is unknown. They're not added to the total (that doesn't mean they're worth 0).",
-"y {0} más":"and {0} more"
+"y {0} más":"and {0} more",
+"ver menos":"show less",
+"ver los {0} pedidos (+{1})":"show all {0} orders (+{1})",
+"Primero los NPCs con algún pedido que ya puedes hacer · {0} · «ver los N pedidos» despliega todos los de ese NPC":"NPCs with an order you can already fill come first · {0} · \"show all N orders\" expands every order for that NPC"
 }
